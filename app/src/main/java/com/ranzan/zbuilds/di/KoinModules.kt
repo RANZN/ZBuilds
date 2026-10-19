@@ -6,14 +6,17 @@ import com.ranzan.zbuilds.data.local.TrackedAppsDataStore
 import com.ranzan.zbuilds.data.remote.GitHubApiService
 import com.ranzan.zbuilds.data.repository.AppRepositoryImpl
 import com.ranzan.zbuilds.data.repository.DownloaderRepositoryImpl
+import com.ranzan.zbuilds.data.repository.SuggestionRepositoryImpl
 import com.ranzan.zbuilds.domain.repository.AppRepository
 import com.ranzan.zbuilds.domain.repository.DownloaderRepository
 import com.ranzan.zbuilds.domain.repository.PackageInspectorRepository
+import com.ranzan.zbuilds.domain.repository.SuggestionRepository
 import com.ranzan.zbuilds.domain.usecase.AddTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.CheckAppUpdatesUseCase
 import com.ranzan.zbuilds.domain.usecase.DeleteTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.DownloadAppUseCase
 import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
+import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
 import com.ranzan.zbuilds.ui.home.HomeViewModel
 import org.koin.android.ext.koin.androidContext
@@ -31,6 +34,7 @@ val appModule = module {
 val repositoryModule = module {
     single<AppRepository> { AppRepositoryImpl(get(), get(), get()) }
     single<DownloaderRepository> { DownloaderRepositoryImpl(get()) }
+    single<SuggestionRepository> { SuggestionRepositoryImpl() }
 }
 
 val useCaseModule = module {
@@ -40,6 +44,7 @@ val useCaseModule = module {
     factory { FetchSourceReleasesUseCase(get()) }
     factory { CheckAppUpdatesUseCase(get()) }
     factory { DownloadAppUseCase(get()) }
+    factory { GetSourceSuggestionsUseCase(get()) }
 }
 
 val viewModelModule = module {
@@ -51,6 +56,7 @@ val viewModelModule = module {
             fetchSourceReleasesUseCase = get(),
             checkAppUpdatesUseCase = get(),
             downloadAppUseCase = get(),
+            getSourceSuggestionsUseCase = get(),
             packageInspector = get()
         )
     }

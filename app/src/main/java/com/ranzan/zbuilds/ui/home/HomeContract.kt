@@ -4,6 +4,7 @@ import android.content.Context
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
+import com.ranzan.zbuilds.domain.model.SourceSuggestion
 import com.ranzan.zbuilds.domain.model.TrackedApp
 
 data class HomeUiState(
@@ -12,6 +13,8 @@ data class HomeUiState(
     val filteredApps: List<TrackedApp> = emptyList(),
     val isRefreshing: Boolean = false,
     val downloadProgressMap: Map<String, DownloadProgress> = emptyMap(),
+    // Suggestions from repository / Remote Config
+    val suggestions: List<SourceSuggestion> = emptyList(),
     // Add App Sheet State
     val isAddSheetOpen: Boolean = false,
     val addSourceUrl: String = "",
@@ -40,4 +43,5 @@ sealed interface HomeUiEvent {
     data class OnDeleteTrackedApp(val appId: String) : HomeUiEvent
     data object OnCheckAllUpdates : HomeUiEvent
     data object OnClearStatusMessage : HomeUiEvent
+    data object OnSettingsClick : HomeUiEvent
 }

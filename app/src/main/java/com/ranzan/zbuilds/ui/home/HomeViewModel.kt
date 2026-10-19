@@ -13,6 +13,7 @@ import com.ranzan.zbuilds.domain.usecase.CheckAppUpdatesUseCase
 import com.ranzan.zbuilds.domain.usecase.DeleteTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.DownloadAppUseCase
 import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
+import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
 import com.ranzan.zbuilds.ui.util.FileIntentHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ class HomeViewModel(
     private val fetchSourceReleasesUseCase: FetchSourceReleasesUseCase,
     private val checkAppUpdatesUseCase: CheckAppUpdatesUseCase,
     private val downloadAppUseCase: DownloadAppUseCase,
+    private val getSourceSuggestionsUseCase: GetSourceSuggestionsUseCase,
     private val packageInspector: PackageInspectorRepository
 ) : ViewModel() {
 
@@ -45,6 +47,13 @@ class HomeViewModel(
                         filteredApps = filterApps(apps, state.searchQuery)
                     )
                 }
+            }
+        }
+
+        // Collect source suggestions from repository (configured for Remote Config)
+        viewModelScope.launch {
+            getSourceSuggestionsUseCase().collect { suggestions ->
+                _uiState.update { it.copy(suggestions = suggestions) }
             }
         }
 
@@ -133,6 +142,9 @@ class HomeViewModel(
             }
             is HomeUiEvent.OnClearStatusMessage -> {
                 _uiState.update { it.copy(statusMessage = null) }
+            }
+            is HomeUiEvent.OnSettingsClick -> {
+                _uiState.update { it.copy(statusMessage = "Settings screen coming soon") }
             }
         }
     }
