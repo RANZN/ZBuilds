@@ -8,6 +8,9 @@ import kotlinx.coroutines.flow.Flow
 class DownloadAppUseCase(
     private val downloaderRepository: DownloaderRepository
 ) {
+    suspend operator fun invoke(app: TrackedApp): Result<String> =
+        startDownload(app)
+
     suspend fun startDownload(app: TrackedApp): Result<String> =
         downloaderRepository.download(app)
 
