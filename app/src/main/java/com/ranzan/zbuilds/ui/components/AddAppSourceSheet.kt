@@ -52,11 +52,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
 import com.ranzan.zbuilds.ui.theme.AccentBlue
+import com.ranzan.zbuilds.ui.theme.AccentGreen
 import com.ranzan.zbuilds.ui.theme.AccentOrange
 import com.ranzan.zbuilds.ui.theme.DarkBackground
 import com.ranzan.zbuilds.ui.theme.DarkCardBorder
