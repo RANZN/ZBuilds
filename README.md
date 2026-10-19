@@ -1,6 +1,6 @@
 # ZBuilds ⚡
 
-[![Build & Release APK](https://github.com/RANZN/Morphe-Builds/actions/workflows/release.yml/badge.svg)](https://github.com/RANZN/Morphe-Builds/actions/workflows/release.yml)
+[![Build & Release APK](https://github.com/RANZN/ZBuilds/actions/workflows/release.yml/badge.svg)](https://github.com/RANZN/ZBuilds/actions/workflows/release.yml)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg?logo=kotlin)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-2024.10.00-brightgreen.svg?logo=android)](https://developer.android.com/jetpack/compose)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2B%20MVI-blue.svg)](https://developer.android.com/topic/architecture)
@@ -36,6 +36,11 @@ Built strictly following **Clean Architecture** principles and **MVI (Model-View
   - **Generate** action: Directly opens GitHub token creation page with pre-filled scopes (`public_repo`).
   - **Paste** action: Instantly reads token from the clipboard.
   - **Masked Token Security**: Never displays the raw token in plain text; automatically masks input with bullet obfuscation, eye-toggle visibility, and `••••••••••••${last4}` verification.
+- **Crash Tracking & Analytics**:
+  - Global `UncaughtExceptionHandler` that intercepts all uncaught thread exceptions without crashing silently.
+  - Generates comprehensive diagnostic reports with stack traces, rolling breadcrumbs, device ABI, OS version, and app version.
+  - Thread-safe local persistence (`filesDir/crash_reports/`) with rolling retention limits (max 25 reports).
+  - Built-in Settings card with crash report history, "Test Tracker" simulation button, and instant cache purge.
 - **Storage Access Framework (SAF)**: Choose custom download folders anywhere on internal or external storage (`content://` URI tree persistence).
 - **Automated Cache & Storage Cleanup**:
   - Configurable retention periods (1 Day, 7 Days, 30 Days).
@@ -64,7 +69,7 @@ The project adheres to strict **Clean Architecture** with a unidirectional data 
                         ┌────────────────────┴────────────────────┐
                         │                  Data                   │
                         │   (Retrofit, OkHttp, DataStore, SAF,    │
-                        │        WorkManager, Room/Memory)        │
+                        │     WorkManager, Analytics/Crash)       │
                         └─────────────────────────────────────────┘
 ```
 
@@ -72,6 +77,7 @@ The project adheres to strict **Clean Architecture** with a unidirectional data 
 - **Dependency Injection**: 100% powered by **Koin** (`koin-android`, `koin-androidx-compose`).
 - **Networking**: **Retrofit 2** & **OkHttp 3** with custom `AuthInterceptor` injecting the user's GitHub Token.
 - **Persistence**: **Jetpack DataStore Preferences** for encrypted/atomic settings persistence.
+- **Telemetry & Diagnostics**: Custom `ZBuildsCrashHandler` + `AnalyticsTracker` with rolling breadcrumbs and local JSON report storage.
 - **Background Tasks**: **Android WorkManager** with `CoroutineWorker` for periodic retention cleanup.
 
 ---
@@ -84,16 +90,17 @@ com.ranzan.zbuilds/
 │   ├── mvi/             # UiState, UiEvent, UiEffect, BaseViewModel
 │   └── utils/           # Architecture and format detection helpers
 ├── data/
+│   ├── analytics/       # ZBuildsCrashHandler, CrashStorageDataSource, AnalyticsTrackerImpl
 │   ├── local/           # DataStore preferences & AppDatabase
 │   ├── remote/          # GitHub API, Retrofit client, AuthInterceptor, parser
-│   ├── repository/      # SettingsRepositoryImpl & ReleaseRepositoryImpl
+│   ├── repository/      # SettingsRepositoryImpl, AppRepositoryImpl, SuggestionRepositoryImpl
 │   └── scheduler/       # WorkManager cleanup worker implementation
 ├── domain/
-│   ├── model/           # AppBuild, Release, AppSettings, AppType
-│   ├── repository/      # ReleaseRepository & SettingsRepository contracts
-│   └── usecase/         # Single-responsibility UseCases (GetSettings, SaveToken, etc.)
+│   ├── model/           # AppBuild, Release, AppSettings, AppType, CrashReport, AnalyticsEvent
+│   ├── repository/      # ReleaseRepository, SettingsRepository, AnalyticsTracker contracts
+│   └── usecase/         # Single-responsibility UseCases (GetSettings, SaveToken, TrackCrash, etc.)
 ├── di/
-│   └── AppModule.kt     # Koin DI definitions (network, data, domain, viewmodels)
+│   └── KoinModules.kt   # Koin DI definitions (network, data, domain, viewmodels)
 └── ui/
     ├── home/            # HomeScreen, HomeViewModel, HomeContract, AddAppSourceSheet
     ├── settings/        # SettingsScreen, SettingsViewModel, SettingsContract
@@ -125,8 +132,8 @@ The repository includes a production-grade GitHub Actions release workflow:
 ### Clone & Build
 ```bash
 # Clone the repository
-git clone https://github.com/RANZN/Morphe-Builds.git
-cd Morphe-Builds
+git clone https://github.com/RANZN/ZBuilds.git
+cd ZBuilds
 
 # Build debug APK
 ./gradlew assembleDebug
