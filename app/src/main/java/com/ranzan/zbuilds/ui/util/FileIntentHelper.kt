@@ -65,4 +65,19 @@ object FileIntentHelper {
             Toast.makeText(context, "Could not open ZIP: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
+
+    fun openApp(context: Context, packageName: String) {
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+            } else {
+                Toast.makeText(context, "Could not open application", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Error opening app: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
+

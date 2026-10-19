@@ -3,19 +3,19 @@ package com.ranzan.zbuilds.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ranzan.zbuilds.core.utils.FormatHelper
+import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
 import com.ranzan.zbuilds.domain.model.TrackedApp
-import com.ranzan.zbuilds.domain.repository.PackageInspectorRepository
 import com.ranzan.zbuilds.domain.usecase.AddTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.CheckAppUpdatesUseCase
 import com.ranzan.zbuilds.domain.usecase.DeleteTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.DownloadAppUseCase
 import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
+import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
-import com.ranzan.zbuilds.ui.util.FileIntentHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,7 +31,7 @@ class HomeViewModel(
     private val checkAppUpdatesUseCase: CheckAppUpdatesUseCase,
     private val downloadAppUseCase: DownloadAppUseCase,
     private val getSourceSuggestionsUseCase: GetSourceSuggestionsUseCase,
-    private val packageInspector: PackageInspectorRepository
+    private val getSettingsUseCase: GetSettingsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -44,7 +44,20 @@ class HomeViewModel(
                 _uiState.update { state ->
                     state.copy(
                         trackedApps = apps,
-                        filteredApps = filterApps(apps, state.searchQuery)
+                        filteredApps = filterApps(apps, state.searchQuery, state.showApks, state.showModules)
+                    )
+                }
+            }
+        }
+
+        // Collect user settings to apply build format filtering dynamically
+        viewModelScope.launch {
+            getSettingsUseCase().collect { settings ->
+                _uiState.update { state ->
+                    state.copy(
+                        showApks = settings.showApks,
+                        showModules = settings.showModules,
+                        filteredApps = filterApps(state.trackedApps, state.searchQuery, settings.showApks, settings.showModules)
                     )
                 }
             }
@@ -67,7 +80,7 @@ class HomeViewModel(
                 _uiState.update { state ->
                     state.copy(
                         searchQuery = event.query,
-                        filteredApps = filterApps(state.trackedApps, event.query)
+                        filteredApps = filterApps(state.trackedApps, event.query, state.showApks, state.showModules)
                     )
                 }
             }
@@ -119,21 +132,6 @@ class HomeViewModel(
                     downloadAppUseCase.cancelDownload(event.appId)
                 }
             }
-            is HomeUiEvent.OnInstallApk -> {
-                event.app.localFilePath?.let { path ->
-                    FileIntentHelper.installApk(event.context, path)
-                }
-            }
-            is HomeUiEvent.OnOpenApp -> {
-                event.app.packageName?.let { pkg ->
-                    packageInspector.openApp(pkg)
-                }
-            }
-            is HomeUiEvent.OnShareZip -> {
-                event.app.localFilePath?.let { path ->
-                    FileIntentHelper.openOrShareZip(event.context, path)
-                }
-            }
             is HomeUiEvent.OnDeleteTrackedApp -> {
                 viewModelScope.launch {
                     deleteTrackedAppUseCase(event.appId)
@@ -144,7 +142,7 @@ class HomeViewModel(
                 _uiState.update { it.copy(statusMessage = null) }
             }
             is HomeUiEvent.OnSettingsClick -> {
-                _uiState.update { it.copy(statusMessage = "Settings screen coming soon") }
+                // Handled in UI navigation
             }
         }
     }
@@ -158,11 +156,11 @@ class HomeViewModel(
             val result = checkAppUpdatesUseCase()
             if (result.isSuccess) {
                 val updatedApps = result.getOrNull().orEmpty()
-                val updateCount = updatedApps.count { it.hasUpdate }
-                val msg = if (updateCount > 0) {
-                    "$updateCount update(s) available!"
+                val newUpdatesCount = updatedApps.count { it.hasUpdate }
+                val message = if (newUpdatesCount > 0) {
+                    "$newUpdatesCount update(s) available!"
                 } else if (!silent) {
-                    "All apps are up to date"
+                    "All tracked apps are up to date"
                 } else {
                     null
                 }
@@ -170,7 +168,7 @@ class HomeViewModel(
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
-                        statusMessage = msg
+                        statusMessage = message
                     )
                 }
             } else {
@@ -187,51 +185,40 @@ class HomeViewModel(
     private fun fetchSourceReleases() {
         val url = _uiState.value.addSourceUrl.trim()
         if (url.isBlank()) {
-            _uiState.update { it.copy(addSourceError = "Please enter a valid GitHub repository URL") }
+            _uiState.update { it.copy(addSourceError = "Please enter a GitHub repository URL") }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isFetchingSource = true,
-                    addSourceError = null,
-                    fetchedRelease = null
-                )
-            }
+            _uiState.update { it.copy(isFetchingSource = true, addSourceError = null) }
 
             val result = fetchSourceReleasesUseCase(url)
             if (result.isSuccess) {
-                val release = result.getOrThrow()
-                if (release.assets.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            isFetchingSource = false,
-                            addSourceError = "No APK or ZIP assets found in release ${release.tag}"
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            isFetchingSource = false,
-                            fetchedRelease = release,
-                            addSourceError = null
-                        )
-                    }
+                val release = result.getOrNull()
+                _uiState.update {
+                    it.copy(
+                        isFetchingSource = false,
+                        fetchedRelease = release,
+                        addSourceError = if (release?.assets.isNullOrEmpty()) "No APK or ZIP assets found in this release" else null
+                    )
                 }
             } else {
                 _uiState.update {
                     it.copy(
                         isFetchingSource = false,
-                        addSourceError = result.exceptionOrNull()?.message ?: "Failed to fetch releases"
+                        addSourceError = result.exceptionOrNull()?.message ?: "Failed to fetch repository release"
                     )
                 }
             }
         }
     }
 
-    private fun trackAndDownloadAsset(asset: ReleaseAsset, release: SourceRelease, customName: String?) {
-        val appName = customName?.takeIf { it.isNotBlank() }
+    private fun trackAndDownloadAsset(
+        asset: ReleaseAsset,
+        release: SourceRelease,
+        customName: String?
+    ) {
+        val appName = customName?.ifBlank { null }
             ?: FormatHelper.deriveAppNameFromAsset(asset.name)
 
         val newApp = TrackedApp(
@@ -242,11 +229,12 @@ class HomeViewModel(
             fileType = asset.fileType,
             arch = asset.arch,
             assetName = asset.name,
-            assetPattern = asset.name,
-            downloadedVersion = release.tag,
             latestVersion = release.tag,
             latestDownloadUrl = asset.downloadUrl,
             latestSizeBytes = asset.sizeBytes,
+            downloadedVersion = "",
+            installedVersion = null,
+            isInstalled = false,
             localFilePath = null,
             hasUpdate = false,
             lastCheckedTimestamp = System.currentTimeMillis()
@@ -298,10 +286,22 @@ class HomeViewModel(
         }
     }
 
-    private fun filterApps(apps: List<TrackedApp>, query: String): List<TrackedApp> {
-        if (query.isBlank()) return apps
+    private fun filterApps(
+        apps: List<TrackedApp>,
+        query: String,
+        showApks: Boolean = true,
+        showModules: Boolean = true
+    ): List<TrackedApp> {
+        val formatFiltered = apps.filter { app ->
+            when (app.fileType) {
+                AppFileType.APK -> showApks
+                AppFileType.ZIP -> showModules
+            }
+        }
+
+        if (query.isBlank()) return formatFiltered
         val cleanQuery = query.trim().lowercase()
-        return apps.filter { app ->
+        return formatFiltered.filter { app ->
             app.name.lowercase().contains(cleanQuery) ||
                     app.latestVersion.lowercase().contains(cleanQuery) ||
                     app.downloadedVersion.lowercase().contains(cleanQuery) ||

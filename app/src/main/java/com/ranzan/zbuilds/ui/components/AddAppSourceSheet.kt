@@ -45,6 +45,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -80,6 +81,8 @@ fun AddAppSourceSheet(
     errorMessage: String?,
     sheetState: SheetState,
     suggestions: List<SourceSuggestion> = emptyList(),
+    showApks: Boolean = true,
+    showModules: Boolean = true,
     onUrlChange: (String) -> Unit,
     onFetchClick: () -> Unit,
     onSelectAsset: (ReleaseAsset, SourceRelease) -> Unit,
@@ -241,9 +244,18 @@ fun AddAppSourceSheet(
 
             // Fetched Release & Asset List
             if (fetchedRelease != null) {
+                val filteredAssets = remember(fetchedRelease, showApks, showModules) {
+                    fetchedRelease.assets.filter { asset ->
+                        when (asset.fileType) {
+                            AppFileType.APK -> showApks
+                            AppFileType.ZIP -> showModules
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Release: ${fetchedRelease.tag} (${fetchedRelease.assets.size} downloads found)",
+                    text = "Release: ${fetchedRelease.tag} (${filteredAssets.size} downloads found)",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = AccentGreen
@@ -261,7 +273,7 @@ fun AddAppSourceSheet(
                         .height(340.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(fetchedRelease.assets, key = { it.name }) { asset ->
+                    items(filteredAssets, key = { it.name }) { asset ->
                         Card(
                             onClick = { onSelectAsset(asset, fetchedRelease) },
                             modifier = Modifier.fillMaxWidth(),

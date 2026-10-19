@@ -219,9 +219,21 @@ fun HomeScreen(
                             downloadProgress = state.downloadProgressMap[app.id],
                             onDownloadClick = { viewModel.onEvent(HomeUiEvent.OnDownloadApp(app)) },
                             onCancelDownloadClick = { viewModel.onEvent(HomeUiEvent.OnCancelDownload(app.id)) },
-                            onInstallClick = { viewModel.onEvent(HomeUiEvent.OnInstallApk(context, app)) },
-                            onOpenClick = { viewModel.onEvent(HomeUiEvent.OnOpenApp(context, app)) },
-                            onShareZipClick = { viewModel.onEvent(HomeUiEvent.OnShareZip(context, app)) },
+                            onInstallClick = {
+                                app.localFilePath?.let { path ->
+                                    com.ranzan.zbuilds.ui.util.FileIntentHelper.installApk(context, path)
+                                }
+                            },
+                            onOpenClick = {
+                                app.packageName?.let { pkg ->
+                                    com.ranzan.zbuilds.ui.util.FileIntentHelper.openApp(context, pkg)
+                                }
+                            },
+                            onShareZipClick = {
+                                app.localFilePath?.let { path ->
+                                    com.ranzan.zbuilds.ui.util.FileIntentHelper.openOrShareZip(context, path)
+                                }
+                            },
                             onDeleteClick = { viewModel.onEvent(HomeUiEvent.OnDeleteTrackedApp(app.id)) }
                         )
                     }
@@ -239,6 +251,8 @@ fun HomeScreen(
         errorMessage = state.addSourceError,
         sheetState = sheetState,
         suggestions = state.suggestions,
+        showApks = state.showApks,
+        showModules = state.showModules,
         onUrlChange = { viewModel.onEvent(HomeUiEvent.OnSourceUrlChange(it)) },
         onFetchClick = { viewModel.onEvent(HomeUiEvent.OnFetchSourceReleases) },
         onSelectAsset = { asset, release ->

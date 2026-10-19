@@ -1,6 +1,5 @@
 package com.ranzan.zbuilds.ui.home
 
-import android.content.Context
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
@@ -11,6 +10,8 @@ data class HomeUiState(
     val searchQuery: String = "",
     val trackedApps: List<TrackedApp> = emptyList(),
     val filteredApps: List<TrackedApp> = emptyList(),
+    val showApks: Boolean = true,
+    val showModules: Boolean = true,
     val isRefreshing: Boolean = false,
     val downloadProgressMap: Map<String, DownloadProgress> = emptyMap(),
     // Suggestions from repository / Remote Config
@@ -37,9 +38,6 @@ sealed interface HomeUiEvent {
     data class OnSelectAssetToTrack(val asset: ReleaseAsset, val release: SourceRelease, val customName: String? = null) : HomeUiEvent
     data class OnDownloadApp(val app: TrackedApp) : HomeUiEvent
     data class OnCancelDownload(val appId: String) : HomeUiEvent
-    data class OnInstallApk(val context: Context, val app: TrackedApp) : HomeUiEvent
-    data class OnOpenApp(val context: Context, val app: TrackedApp) : HomeUiEvent
-    data class OnShareZip(val context: Context, val app: TrackedApp) : HomeUiEvent
     data class OnDeleteTrackedApp(val appId: String) : HomeUiEvent
     data object OnCheckAllUpdates : HomeUiEvent
     data object OnClearStatusMessage : HomeUiEvent
