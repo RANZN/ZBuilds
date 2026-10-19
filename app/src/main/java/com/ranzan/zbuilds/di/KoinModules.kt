@@ -1,5 +1,8 @@
 package com.ranzan.zbuilds.di
 
+import com.ranzan.zbuilds.data.analytics.AnalyticsTrackerImpl
+import com.ranzan.zbuilds.data.analytics.CrashStorageDataSource
+import com.ranzan.zbuilds.data.analytics.ZBuildsCrashHandler
 import com.ranzan.zbuilds.data.local.AppDownloader
 import com.ranzan.zbuilds.data.local.PackageInspectorImpl
 import com.ranzan.zbuilds.data.local.SettingsDataStore
@@ -9,6 +12,7 @@ import com.ranzan.zbuilds.data.repository.AppRepositoryImpl
 import com.ranzan.zbuilds.data.repository.DownloaderRepositoryImpl
 import com.ranzan.zbuilds.data.repository.SettingsRepositoryImpl
 import com.ranzan.zbuilds.data.repository.SuggestionRepositoryImpl
+import com.ranzan.zbuilds.domain.repository.AnalyticsTracker
 import com.ranzan.zbuilds.domain.repository.AppRepository
 import com.ranzan.zbuilds.domain.repository.DownloaderRepository
 import com.ranzan.zbuilds.domain.repository.PackageInspectorRepository
@@ -16,13 +20,17 @@ import com.ranzan.zbuilds.domain.repository.SettingsRepository
 import com.ranzan.zbuilds.domain.repository.SuggestionRepository
 import com.ranzan.zbuilds.domain.usecase.AddTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.CheckAppUpdatesUseCase
+import com.ranzan.zbuilds.domain.usecase.ClearCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.ClearDownloadCacheUseCase
 import com.ranzan.zbuilds.domain.usecase.DeleteTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.DownloadAppUseCase
 import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
+import com.ranzan.zbuilds.domain.usecase.GetCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
+import com.ranzan.zbuilds.domain.usecase.TrackCrashUseCase
+import com.ranzan.zbuilds.domain.usecase.TrackEventUseCase
 import com.ranzan.zbuilds.domain.usecase.UpdateSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.ValidateGithubTokenUseCase
 import com.ranzan.zbuilds.ui.home.HomeViewModel
@@ -38,6 +46,9 @@ val appModule = module {
     single { PackageInspectorImpl(androidContext()) }
     single<PackageInspectorRepository> { get<PackageInspectorImpl>() }
     single { AppDownloader(androidContext(), get(), get(), get()) }
+    single { CrashStorageDataSource(androidContext()) }
+    single<AnalyticsTracker> { AnalyticsTrackerImpl(androidContext(), get()) }
+    single { ZBuildsCrashHandler(get()) }
 }
 
 val repositoryModule = module {
@@ -59,6 +70,10 @@ val useCaseModule = module {
     factory { UpdateSettingsUseCase(get()) }
     factory { ValidateGithubTokenUseCase(get()) }
     factory { ClearDownloadCacheUseCase(get()) }
+    factory { TrackEventUseCase(get()) }
+    factory { TrackCrashUseCase(get()) }
+    factory { GetCrashReportsUseCase(get()) }
+    factory { ClearCrashReportsUseCase(get()) }
 }
 
 val viewModelModule = module {
@@ -71,7 +86,8 @@ val viewModelModule = module {
             checkAppUpdatesUseCase = get(),
             downloadAppUseCase = get(),
             getSourceSuggestionsUseCase = get(),
-            getSettingsUseCase = get()
+            getSettingsUseCase = get(),
+            trackEventUseCase = get()
         )
     }
     viewModel {
@@ -79,7 +95,11 @@ val viewModelModule = module {
             getSettingsUseCase = get(),
             updateSettingsUseCase = get(),
             validateGithubTokenUseCase = get(),
-            clearDownloadCacheUseCase = get()
+            clearDownloadCacheUseCase = get(),
+            getCrashReportsUseCase = get(),
+            clearCrashReportsUseCase = get(),
+            trackCrashUseCase = get(),
+            trackEventUseCase = get()
         )
     }
 }
