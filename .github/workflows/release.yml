@@ -1,0 +1,132 @@
+name: Build & Release APK
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew Executable
+        run: chmod +x ./gradlew
+
+      - name: Build APK
+        id: build_apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          # Detect available Android build-tools version
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          if [ -d "$SDK_ROOT/build-tools" ]; then
+            BUILD_TOOLS=$(ls -1d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1 | xargs basename)
+          fi
+          BUILD_TOOLS="${BUILD_TOOLS:-35.0.0}"
+          echo "build_tools_version=$BUILD_TOOLS" >> $GITHUB_OUTPUT
+          echo "Using Android build-tools version: $BUILD_TOOLS"
+
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+            echo "Keystore secret detected. Building Release APK..."
+            ./gradlew assembleRelease
+          else
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+            echo "No keystore secret detected. Building Debug APK..."
+            ./gradlew assembleDebug
+          fi
+
+      - name: Sign Release APK
+        if: steps.build_apk.outputs.has_keystore == 'true'
+        uses: r0adkll/sign-android-release@v1
+        id: sign_apk
+        env:
+          BUILD_TOOLS_VERSION: ${{ steps.build_apk.outputs.build_tools_version }}
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Package & Rename APK
+        id: prepare_apk
+        env:
+          SIGNED_APK: ${{ steps.sign_apk.outputs.signedReleaseFile }}
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -n "$SIGNED_APK" ] && [ -f "$SIGNED_APK" ]; then
+            APK_FILE="$SIGNED_APK"
+          else
+            APK_FILE=$(find app/build/outputs/apk/ -name "*.apk" | head -n 1)
+          fi
+
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "Error: No APK found!"
+            exit 1
+          fi
+
+          echo "Selected APK: $APK_FILE"
+
+          # Determine version from tag, release event, or app/build.gradle.kts
+          if [[ "$REF" == refs/tags/* ]]; then
+            VERSION="${REF_NAME#v}"
+          elif [ -n "$RELEASE_TAG" ]; then
+            VERSION="${RELEASE_TAG#v}"
+          else
+            VERSION=$(grep -m1 'versionName' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+            if [ -z "$VERSION" ]; then
+              VERSION="1.0.0"
+            fi
+          fi
+
+          RELEASE_NAME="ZBuilds-v${VERSION}.apk"
+          cp "$APK_FILE" "$RELEASE_NAME"
+
+          echo "apk_path=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release & Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.prepare_apk.outputs.version }}"
+          name: "ZBuilds v${{ steps.prepare_apk.outputs.version }}"
+          body: |
+            ## Automated Release v${{ steps.prepare_apk.outputs.version }}
+            - **Commit**: ${{ github.sha }}
+            - **Triggered by**: @${{ github.actor }}
+
+            ### Installation
+            Download the signed APK attached below and install it directly on your Android device.
+          files: ${{ steps.prepare_apk.outputs.apk_path }}
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
