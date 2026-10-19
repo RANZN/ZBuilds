@@ -258,11 +258,12 @@ fun AddAppSourceSheet(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp),
+                        .height(340.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(fetchedRelease.assets, key = { it.name }) { asset ->
                         Card(
+                            onClick = { onSelectAsset(asset, fetchedRelease) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
@@ -271,17 +272,17 @@ fun AddAppSourceSheet(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = if (asset.fileType == AppFileType.APK) Icons.Default.Android else Icons.Default.FolderZip,
                                     contentDescription = null,
                                     tint = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(26.dp)
                                 )
 
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
@@ -289,13 +290,13 @@ fun AddAppSourceSheet(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = TextPrimary,
-                                        maxLines = 1,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.padding(top = 2.dp)
+                                        modifier = Modifier.padding(top = 3.dp)
                                     ) {
                                         // Badge
                                         Box(
@@ -304,7 +305,7 @@ fun AddAppSourceSheet(
                                                     if (asset.fileType == AppFileType.APK) AccentBlue.copy(alpha = 0.2f) else AccentOrange.copy(alpha = 0.2f),
                                                     RoundedCornerShape(4.dp)
                                                 )
-                                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                .padding(horizontal = 5.dp, vertical = 1.dp)
                                         ) {
                                             Text(
                                                 asset.fileType.displayName,
@@ -324,17 +325,21 @@ fun AddAppSourceSheet(
 
                                 Spacer(modifier = Modifier.width(8.dp))
 
-                                Button(
-                                    onClick = { onSelectAsset(asset, fetchedRelease) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
-                                        contentColor = DarkBackground
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .background(
+                                            if (asset.fileType == AppFileType.APK) GreenPrimary.copy(alpha = 0.15f) else AccentOrange.copy(alpha = 0.15f),
+                                            RoundedCornerShape(8.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Add & Download", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = "Download",
+                                        tint = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
