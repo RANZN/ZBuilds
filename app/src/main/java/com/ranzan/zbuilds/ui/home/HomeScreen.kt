@@ -20,11 +20,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -59,6 +61,7 @@ import org.koin.androidx.compose.koinViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,7 +105,7 @@ fun HomeScreen(
                 contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Header with App Name & Green Indicator
+                // Header with App Name, Status Indicator, and Settings Button
                 item(key = "header") {
                     Row(
                         modifier = Modifier
@@ -122,6 +125,19 @@ fun HomeScreen(
                                 .size(8.dp)
                                 .background(GreenPrimary, CircleShape)
                         )
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(
+                            onClick = {
+                                viewModel.onEvent(HomeUiEvent.OnSettingsClick)
+                                onSettingsClick()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = TextSecondary
+                            )
+                        }
                     }
                 }
 
@@ -220,6 +236,7 @@ fun HomeScreen(
         fetchedRelease = state.fetchedRelease,
         errorMessage = state.addSourceError,
         sheetState = sheetState,
+        suggestions = state.suggestions,
         onUrlChange = { viewModel.onEvent(HomeUiEvent.OnSourceUrlChange(it)) },
         onFetchClick = { viewModel.onEvent(HomeUiEvent.OnFetchSourceReleases) },
         onSelectAsset = { asset, release ->

@@ -57,6 +57,7 @@ import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
+import com.ranzan.zbuilds.domain.model.SourceSuggestion
 import com.ranzan.zbuilds.ui.theme.AccentBlue
 import com.ranzan.zbuilds.ui.theme.AccentGreen
 import com.ranzan.zbuilds.ui.theme.AccentOrange
@@ -78,6 +79,7 @@ fun AddAppSourceSheet(
     fetchedRelease: SourceRelease?,
     errorMessage: String?,
     sheetState: SheetState,
+    suggestions: List<SourceSuggestion> = emptyList(),
     onUrlChange: (String) -> Unit,
     onFetchClick: () -> Unit,
     onSelectAsset: (ReleaseAsset, SourceRelease) -> Unit,
@@ -163,36 +165,31 @@ fun AddAppSourceSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Quick suggestion chips
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val suggestions = listOf(
-                    "ReVanced Modules" to "https://github.com/j-hc/revanced-magisk-module",
-                    "MicroG-RE" to "https://github.com/MorpheApp/MicroG-RE",
-                    "Spotube" to "https://github.com/KRTirtho/Spotube",
-                    "NewPipe" to "https://github.com/TeamNewPipe/NewPipe"
-                )
-
-                suggestions.forEach { (label, url) ->
-                    AssistChip(
-                        onClick = {
-                            onUrlChange(url)
-                            onFetchClick()
-                        },
-                        label = { Text(label, fontSize = 11.sp, color = TextPrimary) },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = DarkSurfaceElevated
-                        ),
-                        border = BorderStroke(1.dp, DarkCardBorder)
-                    )
+            // Quick suggestion chips from ViewModel / Remote Config
+            if (suggestions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    suggestions.forEach { suggestion ->
+                        AssistChip(
+                            onClick = {
+                                onUrlChange(suggestion.url)
+                                onFetchClick()
+                            },
+                            label = { Text(suggestion.label, fontSize = 11.sp, color = TextPrimary) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = DarkSurfaceElevated
+                            ),
+                            border = BorderStroke(1.dp, DarkCardBorder)
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // Fetch Button
             Button(
