@@ -149,14 +149,16 @@ fun HomeScreen(
                     )
                 }
 
-                // Full Width Install/Update Apps Action Card
-                item(key = "update_banner") {
-                    UpdateBannerCard(
-                        updateCount = state.updateCount,
-                        totalAppsCount = state.trackedApps.size,
-                        isRefreshing = state.isRefreshing,
-                        onUpdateClick = { viewModel.onEvent(HomeUiEvent.OnCheckAllUpdates) }
-                    )
+                // Full Width Install/Update Apps Action Card (shown only when apps are tracked)
+                if (state.trackedApps.isNotEmpty()) {
+                    item(key = "update_banner") {
+                        UpdateBannerCard(
+                            updateCount = state.updateCount,
+                            totalAppsCount = state.trackedApps.size,
+                            isRefreshing = state.isRefreshing,
+                            onUpdateClick = { viewModel.onEvent(HomeUiEvent.OnCheckAllUpdates) }
+                        )
+                    }
                 }
 
                 // Section Title
