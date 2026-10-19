@@ -27,10 +27,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -67,6 +69,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
@@ -75,6 +78,7 @@ import com.ranzan.zbuilds.domain.model.AppSettings
 import com.ranzan.zbuilds.ui.theme.AccentGreen
 import com.ranzan.zbuilds.ui.theme.AccentGreenContainer
 import com.ranzan.zbuilds.ui.theme.AccentGreenText
+import com.ranzan.zbuilds.ui.theme.AccentOrange
 import com.ranzan.zbuilds.ui.theme.AccentRed
 import com.ranzan.zbuilds.ui.theme.AccentRedContainer
 import com.ranzan.zbuilds.ui.theme.DarkBorder
@@ -685,7 +689,141 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 4: About ZBuilds
+            // Section 4: Diagnostics & Crash Analytics
+            SettingsSectionCard(title = "Diagnostics & Crash Analytics") {
+                Text(
+                    text = "Real-time crash tracking and exception diagnostics. Uncaught errors are captured with stack traces, breadcrumbs, and device telemetry to prevent regressions.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Crash Monitoring",
+                        style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(AccentGreenContainer)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "Active",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = AccentGreenText,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Recorded Reports",
+                        style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
+                    )
+                    Text(
+                        text = "${state.crashReports.size} stored",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = if (state.crashReports.isNotEmpty()) AccentOrange else TextSecondary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { viewModel.onEvent(SettingsUiEvent.OnSimulateTestCrash) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                        border = BorderStroke(1.dp, DarkBorder),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.BugReport,
+                            contentDescription = "Test Tracker",
+                            tint = AccentOrange,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Test Tracker", fontSize = 13.sp)
+                    }
+
+                    if (state.crashReports.isNotEmpty()) {
+                        OutlinedButton(
+                            onClick = { viewModel.onEvent(SettingsUiEvent.OnClearCrashReports) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
+                            border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Clear Reports",
+                                tint = AccentRed,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Clear Reports", fontSize = 13.sp)
+                        }
+                    }
+                }
+
+                if (state.crashReports.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurfaceElevated)
+                            .padding(10.dp)
+                    ) {
+                        val latest = state.crashReports.first()
+                        Text(
+                            text = "Latest: ${latest.exceptionClass.substringAfterLast('.')}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = AccentRed,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = latest.message ?: "No error message",
+                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = latest.deviceInfo,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // Section 5: About ZBuilds
             SettingsSectionCard(title = "About ZBuilds") {
                 Text(
                     text = "${AppSettings.APP_DESCRIPTION}",

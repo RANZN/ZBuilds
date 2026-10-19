@@ -1,6 +1,7 @@
 package com.ranzan.zbuilds.ui.settings
 
 import com.ranzan.zbuilds.domain.model.AppSettings
+import com.ranzan.zbuilds.domain.model.CrashReport
 
 data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
@@ -9,7 +10,8 @@ data class SettingsUiState(
     val tokenValidationMessage: String? = null,
     val isTokenValid: Boolean = false,
     val isClearingCache: Boolean = false,
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    val crashReports: List<CrashReport> = emptyList()
 )
 
 sealed interface SettingsUiEvent {
@@ -24,4 +26,6 @@ sealed interface SettingsUiEvent {
     data class OnSelectRetentionDays(val days: Int) : SettingsUiEvent
     data object OnClearCache : SettingsUiEvent
     data object OnClearSnackbar : SettingsUiEvent
+    data object OnClearCrashReports : SettingsUiEvent
+    data object OnSimulateTestCrash : SettingsUiEvent
 }

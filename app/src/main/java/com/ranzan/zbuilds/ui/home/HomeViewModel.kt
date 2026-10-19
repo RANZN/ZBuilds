@@ -16,6 +16,7 @@ import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
+import com.ranzan.zbuilds.domain.usecase.TrackEventUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,13 +32,16 @@ class HomeViewModel(
     private val checkAppUpdatesUseCase: CheckAppUpdatesUseCase,
     private val downloadAppUseCase: DownloadAppUseCase,
     private val getSourceSuggestionsUseCase: GetSourceSuggestionsUseCase,
-    private val getSettingsUseCase: GetSettingsUseCase
+    private val getSettingsUseCase: GetSettingsUseCase,
+    private val trackEventUseCase: TrackEventUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        trackEventUseCase("home_screen_opened")
+
         // Collect tracked apps from DataStore
         viewModelScope.launch {
             getTrackedAppsUseCase().collect { apps ->
@@ -85,12 +89,15 @@ class HomeViewModel(
                 }
             }
             is HomeUiEvent.OnRefresh -> {
+                trackEventUseCase("manual_refresh_triggered")
                 checkForUpdates(silent = false)
             }
             is HomeUiEvent.OnCheckAllUpdates -> {
+                trackEventUseCase("check_all_updates_clicked")
                 checkForUpdates(silent = false)
             }
             is HomeUiEvent.OnOpenAddSheet -> {
+                trackEventUseCase("add_app_sheet_opened")
                 _uiState.update {
                     it.copy(
                         isAddSheetOpen = true,
@@ -130,11 +137,13 @@ class HomeViewModel(
             is HomeUiEvent.OnCancelDownload -> {
                 viewModelScope.launch {
                     downloadAppUseCase.cancelDownload(event.appId)
+                    trackEventUseCase("download_cancelled", mapOf("app_id" to event.appId))
                 }
             }
             is HomeUiEvent.OnDeleteTrackedApp -> {
                 viewModelScope.launch {
                     deleteTrackedAppUseCase(event.appId)
+                    trackEventUseCase("app_deleted", mapOf("app_id" to event.appId))
                     _uiState.update { it.copy(statusMessage = "App removed from tracked list") }
                 }
             }
@@ -191,6 +200,7 @@ class HomeViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isFetchingSource = true, addSourceError = null) }
+            trackEventUseCase("fetch_source_releases", mapOf("url" to url))
 
             val result = fetchSourceReleasesUseCase(url)
             if (result.isSuccess) {
@@ -242,6 +252,14 @@ class HomeViewModel(
 
         viewModelScope.launch {
             addTrackedAppUseCase(newApp)
+            trackEventUseCase(
+                "app_tracked",
+                mapOf(
+                    "name" to appName,
+                    "file_type" to asset.fileType.name,
+                    "version" to release.tag
+                )
+            )
 
             // Close sheet and give feedback
             _uiState.update {
@@ -260,6 +278,8 @@ class HomeViewModel(
 
     private fun startDownload(app: TrackedApp) {
         viewModelScope.launch {
+            trackEventUseCase("download_started", mapOf("app_id" to app.id, "app_name" to app.name))
+
             // Observe progress flow
             val progressJob = launch {
                 downloadAppUseCase.observeProgress(app.id).collect { progress ->
@@ -271,17 +291,22 @@ class HomeViewModel(
                 }
             }
 
-            val result = downloadAppUseCase.startDownload(app)
+            // Trigger download execution
+            val result = downloadAppUseCase(app)
+
             progressJob.cancel()
 
-            if (result.isSuccess) {
-                _uiState.update {
-                    it.copy(statusMessage = "Downloaded ${app.name} (${app.latestVersion})")
-                }
-            } else {
-                _uiState.update {
-                    it.copy(statusMessage = "Download failed: ${result.exceptionOrNull()?.message}")
-                }
+            _uiState.update { state ->
+                state.copy(
+                    downloadProgressMap = state.downloadProgressMap - app.id,
+                    statusMessage = if (result.isSuccess) {
+                        trackEventUseCase("download_completed", mapOf("app_id" to app.id, "app_name" to app.name))
+                        "Downloaded ${app.name} (${app.latestVersion})"
+                    } else {
+                        trackEventUseCase("download_failed", mapOf("app_id" to app.id, "error" to (result.exceptionOrNull()?.message ?: "unknown")))
+                        "Download failed: ${result.exceptionOrNull()?.message}"
+                    }
+                )
             }
         }
     }
@@ -289,26 +314,21 @@ class HomeViewModel(
     private fun filterApps(
         apps: List<TrackedApp>,
         query: String,
-        showApks: Boolean = true,
-        showModules: Boolean = true
+        showApks: Boolean,
+        showModules: Boolean
     ): List<TrackedApp> {
-        val formatFiltered = apps.filter { app ->
-            when (app.fileType) {
+        return apps.filter { app ->
+            val matchesQuery = query.isBlank() ||
+                    app.name.contains(query, ignoreCase = true) ||
+                    app.assetName.contains(query, ignoreCase = true) ||
+                    app.latestVersion.contains(query, ignoreCase = true)
+
+            val matchesFormat = when (app.fileType) {
                 AppFileType.APK -> showApks
                 AppFileType.ZIP -> showModules
             }
-        }
 
-        if (query.isBlank()) return formatFiltered
-        val cleanQuery = query.trim().lowercase()
-        return formatFiltered.filter { app ->
-            app.name.lowercase().contains(cleanQuery) ||
-                    app.latestVersion.lowercase().contains(cleanQuery) ||
-                    app.downloadedVersion.lowercase().contains(cleanQuery) ||
-                    app.arch.lowercase().contains(cleanQuery) ||
-                    app.fileType.name.lowercase().contains(cleanQuery) ||
-                    app.assetName.lowercase().contains(cleanQuery) ||
-                    app.sourceUrl.lowercase().contains(cleanQuery)
+            matchesQuery && matchesFormat
         }
     }
 }
