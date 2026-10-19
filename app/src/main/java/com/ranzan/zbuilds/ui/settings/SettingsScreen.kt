@@ -1,5 +1,7 @@
 package com.ranzan.zbuilds.ui.settings
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,8 +29,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,12 +55,18 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
@@ -85,6 +96,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var isTokenVisible by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.snackbarMessage) {
         state.snackbarMessage?.let { msg ->
@@ -161,11 +173,84 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                // Quick Action Buttons: Generate & Paste
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val url = "https://github.com/settings/tokens/new?description=ZBuilds%20Android%20App&scopes=public_repo"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                        border = BorderStroke(1.dp, DarkBorder),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = "Generate",
+                            modifier = Modifier.size(15.dp),
+                            tint = AccentGreen
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Generate", fontSize = 13.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
+                                if (!clip.isNullOrBlank()) {
+                                    viewModel.onEvent(SettingsUiEvent.OnTokenInputChanged(clip))
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                        border = BorderStroke(1.dp, DarkBorder),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentPaste,
+                            contentDescription = "Paste",
+                            modifier = Modifier.size(15.dp),
+                            tint = AccentGreen
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Paste", fontSize = 13.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 OutlinedTextField(
                     value = state.tokenInput,
                     onValueChange = { viewModel.onEvent(SettingsUiEvent.OnTokenInputChanged(it)) },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("ghp_xxxxxxxxxxxx", color = TextMuted) },
+                    visualTransformation = if (isTokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        if (state.tokenInput.isNotEmpty()) {
+                            IconButton(onClick = { isTokenVisible = !isTokenVisible }) {
+                                Icon(
+                                    imageVector = if (isTokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (isTokenVisible) "Hide token" else "Show token",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    },
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -179,6 +264,30 @@ fun SettingsScreen(
                     textStyle = MaterialTheme.typography.bodySmall
                 )
 
+                if (state.settings.githubToken != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "✓ Token Saved & Active",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = AccentGreenText,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = "••••••••••••${state.settings.githubToken?.takeLast(4)}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = TextMuted,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
@@ -186,7 +295,10 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
-                        onClick = { viewModel.onEvent(SettingsUiEvent.OnSaveToken) },
+                        onClick = {
+                            viewModel.onEvent(SettingsUiEvent.OnSaveToken)
+                            isTokenVisible = false
+                        },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AccentGreen,
@@ -219,7 +331,10 @@ fun SettingsScreen(
 
                     if (state.settings.githubToken != null || state.tokenInput.isNotEmpty()) {
                         OutlinedButton(
-                            onClick = { viewModel.onEvent(SettingsUiEvent.OnClearToken) },
+                            onClick = {
+                                viewModel.onEvent(SettingsUiEvent.OnClearToken)
+                                isTokenVisible = false
+                            },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
                             border = BorderStroke(1.dp, DarkBorder),
                             shape = RoundedCornerShape(8.dp)
