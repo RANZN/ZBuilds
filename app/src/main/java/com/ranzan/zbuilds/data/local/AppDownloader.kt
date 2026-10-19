@@ -2,6 +2,8 @@ package com.ranzan.zbuilds.data.local
 
 import android.content.Context
 import android.os.Environment
+import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
@@ -27,6 +29,7 @@ class AppDownloader(
     private val context: Context,
     private val trackedAppsDataStore: TrackedAppsDataStore,
     private val packageInspector: PackageInspectorRepository,
+    private val settingsDataStore: SettingsDataStore? = null,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -73,13 +76,17 @@ class AppDownloader(
             }
             val destinationFile = File(downloadDir, fileName)
 
-            val request = Request.Builder()
+            val token = try { settingsDataStore?.getSettings()?.githubToken } catch (e: Exception) { null }
+            val requestBuilder = Request.Builder()
                 .url(app.latestDownloadUrl)
                 .header("User-Agent", "ZBuilds-Android-App")
                 .get()
-                .build()
 
-            val response = client.newCall(request).execute()
+            if (!token.isNullOrBlank()) {
+                requestBuilder.header("Authorization", "Bearer $token")
+            }
+
+            val response = client.newCall(requestBuilder.build()).execute()
             if (!response.isSuccessful) {
                 val errorMsg = "HTTP error ${response.code}: ${response.message}"
                 flow.value = DownloadProgress.Failed(app.id, errorMsg)
@@ -149,6 +156,39 @@ class AppDownloader(
                 lastCheckedTimestamp = System.currentTimeMillis()
             )
             trackedAppsDataStore.updateTrackedApp(updatedApp)
+
+            // Auto-clean older versions of this app if enabled
+            val currentSettings = try { settingsDataStore?.getSettings() } catch (e: Exception) { null }
+            if (currentSettings?.autoCleanOldVersions == true) {
+                val prefix = app.name.replace(" ", "_")
+                downloadDir.listFiles()?.forEach { file ->
+                    if (file.isFile && file.name.startsWith(prefix) && file.name != fileName) {
+                        file.delete()
+                    }
+                }
+            }
+
+            // Export to custom SAF folder if configured
+            val customFolderUri = currentSettings?.downloadFolderUri
+            if (!customFolderUri.isNullOrBlank()) {
+                try {
+                    val treeUri = Uri.parse(customFolderUri)
+                    val pickedDir = DocumentFile.fromTreeUri(context, treeUri)
+                    if (pickedDir != null && pickedDir.isDirectory) {
+                        val mime = if (app.fileType == AppFileType.APK) "application/vnd.android.package-archive" else "application/zip"
+                        val targetDoc = pickedDir.findFile(fileName) ?: pickedDir.createFile(mime, fileName)
+                        if (targetDoc != null) {
+                            context.contentResolver.openOutputStream(targetDoc.uri)?.use { out ->
+                                destinationFile.inputStream().use { input ->
+                                    input.copyTo(out)
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
 
             flow.value = DownloadProgress.Completed(
                 appId = app.id,
