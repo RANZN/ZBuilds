@@ -20,10 +20,6 @@ Built strictly following **Clean Architecture** principles and **MVI (Model-View
 |:---:|:---:|:---:|:---:|
 | <img src="screenshots/01_home_screen.png" width="220" alt="Home Screen"/> | <img src="screenshots/02_add_app_sheet.png" width="220" alt="Add Source Sheet"/> | <img src="screenshots/03_settings_token.png" width="220" alt="Token Settings"/> | <img src="screenshots/04_settings_cleanup.png" width="220" alt="Storage Cleanup"/> |
 
-| Adaptive Launcher Icon |
-|:---:|
-| <img src="screenshots/05_launcher_icon.png" width="260" alt="Launcher Icon"/> |
-
 ---
 
 ## ✨ Features
