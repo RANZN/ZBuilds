@@ -79,5 +79,17 @@ object FileIntentHelper {
             Toast.makeText(context, "Error opening app: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
+    fun uninstallApp(context: Context, packageName: String) {
+        try {
+            val intent = Intent(Intent.ACTION_DELETE).apply {
+                data = Uri.parse("package:$packageName")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Error launching uninstaller: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
 

@@ -39,6 +39,7 @@
     <string name="card_version_label">Version: %1$s • %2$s</string>
     <string name="card_options_desc">Options</string>
     <string name="card_menu_open">Open App</string>
+    <string name="card_menu_uninstall">Uninstall App</string>
     <string name="card_menu_check_updates">Check Updates</string>
     <string name="card_menu_remove">Remove from Tracked</string>
     <string name="card_downloading">Downloading…</string>

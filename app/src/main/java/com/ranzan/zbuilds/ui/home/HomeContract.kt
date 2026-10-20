@@ -51,6 +51,7 @@ sealed interface HomeUiAction : UiAction {
     // App Actions (delegated to effect handler in host)
     data class OnInstallApp(val localFilePath: String) : HomeUiAction
     data class OnOpenApp(val packageName: String) : HomeUiAction
+    data class OnUninstallApp(val packageName: String) : HomeUiAction
     data class OnShareZip(val localFilePath: String) : HomeUiAction
 }
 
@@ -61,5 +62,6 @@ sealed interface HomeUiEffect : UiEffect {
     data class ShowSnackbar(val message: String) : HomeUiEffect
     data class InstallApk(val filePath: String) : HomeUiEffect
     data class OpenApp(val packageName: String) : HomeUiEffect
+    data class UninstallApp(val packageName: String) : HomeUiEffect
     data class OpenOrShareZip(val filePath: String) : HomeUiEffect
 }

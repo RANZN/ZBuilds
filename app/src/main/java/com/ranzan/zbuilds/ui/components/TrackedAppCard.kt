@@ -16,13 +16,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderZip
-import androidx.compose.material.icons.filled.Launch
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -48,10 +49,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
@@ -77,6 +80,7 @@ fun TrackedAppCard(
     onCancelDownloadClick: () -> Unit,
     onInstallClick: () -> Unit,
     onOpenClick: () -> Unit,
+    onUninstallClick: (String) -> Unit = {},
     onShareZipClick: () -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -195,21 +199,42 @@ fun TrackedAppCard(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
-                        if (app.isInstalled && app.packageName != null) {
+                        val targetPkg = app.packageName ?: (if (app.fileType == AppFileType.APK) {
+                            app.localFilePath?.let { path ->
+                                try {
+                                    context.packageManager.getPackageArchiveInfo(path, 0)?.packageName
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            }
+                        } else null)
+
+                        if (app.isInstalled && !targetPkg.isNullOrBlank()) {
                             DropdownMenuItem(
-                                text = { Text("Open App") },
+                                text = { Text(stringResource(R.string.card_menu_open)) },
                                 onClick = {
                                     showMenu = false
                                     onOpenClick()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Launch, contentDescription = null)
+                                    Icon(Icons.AutoMirrored.Filled.Launch, contentDescription = null)
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.card_menu_uninstall)) },
+                                onClick = {
+                                    showMenu = false
+                                    onUninstallClick(targetPkg)
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = AccentOrange)
                                 }
                             )
                         }
 
                         DropdownMenuItem(
-                            text = { Text("Check Updates") },
+                            text = { Text(stringResource(R.string.card_menu_check_updates)) },
                             onClick = {
                                 showMenu = false
                                 onDownloadClick()
@@ -220,7 +245,7 @@ fun TrackedAppCard(
                         )
 
                         DropdownMenuItem(
-                            text = { Text("Remove from Tracked", color = Color(0xFFFF5252)) },
+                            text = { Text(stringResource(R.string.card_menu_remove), color = Color(0xFFFF5252)) },
                             onClick = {
                                 showMenu = false
                                 onDeleteClick()

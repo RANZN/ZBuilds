@@ -91,6 +91,7 @@ fun HomeScreenHost(
                 is HomeUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
                 is HomeUiEffect.InstallApk -> FileIntentHelper.installApk(context, effect.filePath)
                 is HomeUiEffect.OpenApp -> FileIntentHelper.openApp(context, effect.packageName)
+                is HomeUiEffect.UninstallApp -> FileIntentHelper.uninstallApp(context, effect.packageName)
                 is HomeUiEffect.OpenOrShareZip -> FileIntentHelper.openOrShareZip(context, effect.filePath)
             }
         }
@@ -285,6 +286,9 @@ fun HomeScreen(
                                 app.packageName?.let { pkg ->
                                     onAction(HomeUiAction.OnOpenApp(pkg))
                                 }
+                            },
+                            onUninstallClick = { pkg ->
+                                onAction(HomeUiAction.OnUninstallApp(pkg))
                             },
                             onShareZipClick = {
                                 app.localFilePath?.let { path ->

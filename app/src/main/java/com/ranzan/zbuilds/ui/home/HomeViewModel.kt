@@ -148,6 +148,9 @@ class HomeViewModel(
             is HomeUiAction.OnOpenApp -> {
                 sendEffect(HomeUiEffect.OpenApp(action.packageName))
             }
+            is HomeUiAction.OnUninstallApp -> {
+                sendEffect(HomeUiEffect.UninstallApp(action.packageName))
+            }
             is HomeUiAction.OnShareZip -> {
                 sendEffect(HomeUiEffect.OpenOrShareZip(action.localFilePath))
             }
