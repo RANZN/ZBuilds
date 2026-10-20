@@ -1,6 +1,7 @@
 package com.ranzan.zbuilds.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,10 +45,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
+import com.ranzan.zbuilds.core.utils.BuildVariant
+import com.ranzan.zbuilds.core.utils.BuildVariantHelper
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
@@ -78,9 +85,44 @@ fun TrackedAppCard(
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     val isDownloading = downloadProgress is DownloadProgress.Downloading
     val fileExists = app.localFilePath?.let { File(it).exists() } == true
+
+    // Retrieve system app icon if installed
+    val installedAppIcon = remember(app.isInstalled, app.packageName, app.localFilePath) {
+        if (app.fileType == AppFileType.APK) {
+            val pkg = app.packageName ?: app.localFilePath?.let { path ->
+                try {
+                    context.packageManager.getPackageArchiveInfo(path, 0)?.packageName
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            if (!pkg.isNullOrBlank()) {
+                try {
+                    context.packageManager.getApplicationIcon(pkg)
+                } catch (e: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+    val installedAppBitmap = remember(installedAppIcon) {
+        installedAppIcon?.let { drawable ->
+            try {
+                drawable.toBitmap().asImageBitmap()
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -103,17 +145,26 @@ fun TrackedAppCard(
                     modifier = Modifier
                         .size(44.dp)
                         .background(
-                            color = if (app.fileType == AppFileType.APK) DarkSurfaceElevated else AccentOrange.copy(alpha = 0.15f),
+                            color = if (installedAppBitmap != null) DarkSurfaceElevated else if (app.fileType == AppFileType.APK) DarkSurfaceElevated else AccentOrange.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(12.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = if (app.fileType == AppFileType.APK) Icons.Default.Android else Icons.Default.FolderZip,
-                        contentDescription = null,
-                        tint = if (app.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (installedAppBitmap != null) {
+                        Image(
+                            bitmap = installedAppBitmap,
+                            contentDescription = "${app.name} icon",
+                            modifier = Modifier.size(34.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (app.fileType == AppFileType.APK) Icons.Default.Android else Icons.Default.FolderZip,
+                            contentDescription = null,
+                            tint = if (app.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -163,6 +214,35 @@ fun TrackedAppCard(
                                 color = TextSecondary
                             )
                         }
+
+                        // Build Variant Pill (Debug or Release) - only if data available
+                        val variant = remember(app.assetName, app.packageName, app.isInstalled, app.localFilePath) {
+                            BuildVariantHelper.detectAppVariant(
+                                context = context,
+                                packageName = app.packageName,
+                                isInstalled = app.isInstalled,
+                                localFilePath = app.localFilePath,
+                                assetName = app.assetName,
+                                downloadUrl = app.latestDownloadUrl
+                            )
+                        }
+                        if (variant != null) {
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = if (variant == BuildVariant.DEBUG) AccentOrange.copy(alpha = 0.2f) else AccentGreen.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = variant.displayName,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (variant == BuildVariant.DEBUG) AccentOrange else AccentGreen
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(2.dp))
@@ -179,60 +259,74 @@ fun TrackedAppCard(
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "Options",
-                            tint = TextMuted
+                            tint = TextSecondary
                         )
                     }
 
                     DropdownMenu(
                         expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        modifier = Modifier.background(DarkSurfaceElevated)
+                        onDismissRequest = { showMenu = false }
                     ) {
+                        if (app.isInstalled && app.packageName != null) {
+                            DropdownMenuItem(
+                                text = { Text("Open App") },
+                                onClick = {
+                                    showMenu = false
+                                    onOpenClick()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Launch, contentDescription = null)
+                                }
+                            )
+                        }
+
                         DropdownMenuItem(
-                            text = { Text("Re-download", color = TextPrimary) },
-                            leadingIcon = { Icon(Icons.Default.Download, contentDescription = null, tint = GreenPrimary) },
+                            text = { Text("Check Updates") },
                             onClick = {
                                 showMenu = false
                                 onDownloadClick()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.SystemUpdate, contentDescription = null)
                             }
                         )
+
                         DropdownMenuItem(
-                            text = { Text("Remove from tracked", color = Color(0xFFFF5252)) },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF5252)) },
+                            text = { Text("Remove from Tracked", color = Color(0xFFFF5252)) },
                             onClick = {
                                 showMenu = false
                                 onDeleteClick()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF5252))
                             }
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Status Banner / Pill
+            // Download Progress Bar or Update Notice
             if (isDownloading) {
-                val progress = (downloadProgress as DownloadProgress.Downloading)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(DarkSurfaceElevated, RoundedCornerShape(8.dp))
-                        .padding(8.dp)
-                ) {
+                val progress = downloadProgress as DownloadProgress.Downloading
+                val percentInt = (progress.progressPercent * 100).toInt()
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             text = "Downloading...",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AccentBlue
+                            fontSize = 12.sp,
+                            color = GreenPrimary,
+                            fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "${(progress.progressPercent * 100).toInt()}% (${FormatHelper.formatBytes(progress.downloadedBytes)} / ${FormatHelper.formatBytes(progress.totalBytes)})",
-                            fontSize = 11.sp,
-                            color = TextSecondary
+                            text = "$percentInt%",
+                            fontSize = 12.sp,
+                            color = GreenPrimary,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
@@ -241,9 +335,20 @@ fun TrackedAppCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp),
-                        color = AccentBlue,
-                        trackColor = DarkCardBorder
+                        color = GreenPrimary,
+                        trackColor = DarkSurfaceElevated
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${FormatHelper.formatBytes(progress.downloadedBytes)} / ${FormatHelper.formatBytes(progress.totalBytes)}",
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
+                    }
                 }
             } else if (app.hasUpdate) {
                 Box(

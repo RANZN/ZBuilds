@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -40,51 +39,99 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ranzan.zbuilds.R
+import com.ranzan.zbuilds.domain.model.AppFileType
+import com.ranzan.zbuilds.domain.model.DownloadProgress
+import com.ranzan.zbuilds.domain.model.TrackedApp
 import com.ranzan.zbuilds.ui.components.AddAppSourceSheet
 import com.ranzan.zbuilds.ui.components.TopSearchBar
 import com.ranzan.zbuilds.ui.components.TrackedAppCard
 import com.ranzan.zbuilds.ui.components.UpdateBannerCard
 import com.ranzan.zbuilds.ui.theme.DarkBackground
 import com.ranzan.zbuilds.ui.theme.DarkSurface
-import com.ranzan.zbuilds.ui.theme.DarkSurfaceElevated
 import com.ranzan.zbuilds.ui.theme.GreenPrimary
 import com.ranzan.zbuilds.ui.theme.TextMuted
 import com.ranzan.zbuilds.ui.theme.TextPrimary
 import com.ranzan.zbuilds.ui.theme.TextSecondary
+import com.ranzan.zbuilds.ui.theme.ZBuildsTheme
+import com.ranzan.zbuilds.ui.util.FileIntentHelper
 import org.koin.androidx.compose.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Host composable for HomeScreen responsible for ViewModel injection,
+ * collecting state, handling one-shot effects (navigation, intents, snackbars),
+ * and managing Android lifecycle events.
+ */
 @Composable
-fun HomeScreen(
+fun HomeScreenHost(
     onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.onAction(HomeUiAction.OnResume)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEffect.collect { effect ->
+            when (effect) {
+                is HomeUiEffect.NavigateToSettings -> onSettingsClick()
+                is HomeUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
+                is HomeUiEffect.InstallApk -> FileIntentHelper.installApk(context, effect.filePath)
+                is HomeUiEffect.OpenApp -> FileIntentHelper.openApp(context, effect.packageName)
+                is HomeUiEffect.OpenOrShareZip -> FileIntentHelper.openOrShareZip(context, effect.filePath)
+            }
+        }
+    }
+
+    HomeScreen(
+        state = state,
+        snackbarHostState = snackbarHostState,
+        onAction = viewModel::onAction
+    )
+}
+
+/**
+ * Pure UI Composable for Home Screen.
+ * Contains zero ViewModel or Android intent dependencies to guarantee seamless Compose Previews.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(
+    state: HomeUiState,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onAction: (HomeUiAction) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Notify user of status messages
-    LaunchedEffect(state.statusMessage) {
-        state.statusMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            viewModel.onEvent(HomeUiEvent.OnClearStatusMessage)
+    val isAnyUpdateDownloading = remember(state.downloadProgressMap, state.trackedApps) {
+        state.trackedApps.any { app ->
+            app.hasUpdate && state.downloadProgressMap[app.id] is DownloadProgress.Downloading
         }
     }
 
     Scaffold(
+        modifier = modifier,
         containerColor = DarkBackground,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { viewModel.onEvent(HomeUiEvent.OnOpenAddSheet) },
-                icon = { Icon(Icons.Default.Add, contentDescription = "Add Source") },
-                text = { Text("Add", fontWeight = FontWeight.Bold, fontSize = 14.sp) },
+                onClick = { onAction(HomeUiAction.OnOpenAddSheet) },
+                icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_action_add_desc)) },
+                text = { Text(stringResource(R.string.home_btn_add), fontWeight = FontWeight.Bold, fontSize = 14.sp) },
                 containerColor = GreenPrimary,
                 contentColor = DarkBackground,
                 shape = RoundedCornerShape(16.dp)
@@ -93,7 +140,7 @@ fun HomeScreen(
     ) { paddingValues ->
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
-            onRefresh = { viewModel.onEvent(HomeUiEvent.OnRefresh) },
+            onRefresh = { onAction(HomeUiAction.OnRefresh) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -114,7 +161,7 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "ZBuilds",
+                            text = stringResource(R.string.app_name),
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
@@ -127,14 +174,11 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         IconButton(
-                            onClick = {
-                                viewModel.onEvent(HomeUiEvent.OnSettingsClick)
-                                onSettingsClick()
-                            }
+                            onClick = { onAction(HomeUiAction.OnSettingsClick) }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
+                                contentDescription = stringResource(R.string.home_settings_desc),
                                 tint = TextSecondary
                             )
                         }
@@ -145,7 +189,7 @@ fun HomeScreen(
                 item(key = "search_bar") {
                     TopSearchBar(
                         query = state.searchQuery,
-                        onQueryChange = { viewModel.onEvent(HomeUiEvent.OnSearchQueryChange(it)) }
+                        onQueryChange = { onAction(HomeUiAction.OnSearchQueryChange(it)) }
                     )
                 }
 
@@ -156,7 +200,8 @@ fun HomeScreen(
                             updateCount = state.updateCount,
                             totalAppsCount = state.trackedApps.size,
                             isRefreshing = state.isRefreshing,
-                            onUpdateClick = { viewModel.onEvent(HomeUiEvent.OnCheckAllUpdates) }
+                            isDownloading = isAnyUpdateDownloading,
+                            onUpdateClick = { onAction(HomeUiAction.OnUpdateAll) }
                         )
                     }
                 }
@@ -164,7 +209,11 @@ fun HomeScreen(
                 // Section Title
                 item(key = "section_title") {
                     Text(
-                        text = if (state.searchQuery.isNotBlank()) "SEARCH RESULTS (${state.filteredApps.size})" else "ADDED APPS (${state.trackedApps.size})",
+                        text = if (state.searchQuery.isNotBlank()) {
+                            stringResource(R.string.home_search_results_title, state.filteredApps.size)
+                        } else {
+                            stringResource(R.string.home_added_apps_title, state.trackedApps.size)
+                        },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextSecondary,
@@ -196,7 +245,11 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = if (state.searchQuery.isNotBlank()) "No apps matching \"${state.searchQuery}\"" else "No Apps Added Yet",
+                                    text = if (state.searchQuery.isNotBlank()) {
+                                        stringResource(R.string.home_empty_search_title, state.searchQuery)
+                                    } else {
+                                        stringResource(R.string.home_empty_apps_title)
+                                    },
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = TextPrimary,
@@ -204,7 +257,11 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = if (state.searchQuery.isNotBlank()) "Try searching for a different keyword or clear the search filter." else "Tap the (+ Add) button below to paste any GitHub repository link and choose the APK or ZIP build to track.",
+                                    text = if (state.searchQuery.isNotBlank()) {
+                                        stringResource(R.string.home_empty_search_subtitle)
+                                    } else {
+                                        stringResource(R.string.home_empty_apps_subtitle)
+                                    },
                                     fontSize = 12.sp,
                                     color = TextSecondary,
                                     textAlign = TextAlign.Center
@@ -217,24 +274,24 @@ fun HomeScreen(
                         TrackedAppCard(
                             app = app,
                             downloadProgress = state.downloadProgressMap[app.id],
-                            onDownloadClick = { viewModel.onEvent(HomeUiEvent.OnDownloadApp(app)) },
-                            onCancelDownloadClick = { viewModel.onEvent(HomeUiEvent.OnCancelDownload(app.id)) },
+                            onDownloadClick = { onAction(HomeUiAction.OnDownloadApp(app)) },
+                            onCancelDownloadClick = { onAction(HomeUiAction.OnCancelDownload(app.id)) },
                             onInstallClick = {
                                 app.localFilePath?.let { path ->
-                                    com.ranzan.zbuilds.ui.util.FileIntentHelper.installApk(context, path)
+                                    onAction(HomeUiAction.OnInstallApp(path))
                                 }
                             },
                             onOpenClick = {
                                 app.packageName?.let { pkg ->
-                                    com.ranzan.zbuilds.ui.util.FileIntentHelper.openApp(context, pkg)
+                                    onAction(HomeUiAction.OnOpenApp(pkg))
                                 }
                             },
                             onShareZipClick = {
                                 app.localFilePath?.let { path ->
-                                    com.ranzan.zbuilds.ui.util.FileIntentHelper.openOrShareZip(context, path)
+                                    onAction(HomeUiAction.OnShareZip(path))
                                 }
                             },
-                            onDeleteClick = { viewModel.onEvent(HomeUiEvent.OnDeleteTrackedApp(app.id)) }
+                            onDeleteClick = { onAction(HomeUiAction.OnDeleteTrackedApp(app.id)) }
                         )
                     }
                 }
@@ -253,11 +310,62 @@ fun HomeScreen(
         suggestions = state.suggestions,
         showApks = state.showApks,
         showModules = state.showModules,
-        onUrlChange = { viewModel.onEvent(HomeUiEvent.OnSourceUrlChange(it)) },
-        onFetchClick = { viewModel.onEvent(HomeUiEvent.OnFetchSourceReleases) },
+        onUrlChange = { onAction(HomeUiAction.OnSourceUrlChange(it)) },
+        onFetchClick = { onAction(HomeUiAction.OnFetchSourceReleases) },
         onSelectAsset = { asset, release ->
-            viewModel.onEvent(HomeUiEvent.OnSelectAssetToTrack(asset, release))
+            onAction(HomeUiAction.OnSelectAssetToTrack(asset, release))
         },
-        onDismiss = { viewModel.onEvent(HomeUiEvent.OnCloseAddSheet) }
+        onDismiss = { onAction(HomeUiAction.OnCloseAddSheet) }
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenPreview() {
+    ZBuildsTheme {
+        HomeScreen(
+            state = HomeUiState(
+                trackedApps = listOf(
+                    TrackedApp(
+                        id = "1",
+                        name = "ViMusic",
+                        sourceUrl = "https://github.com/vfsfitvnm/ViMusic",
+                        packageName = "it.vfsfitvnm.vimusic",
+                        fileType = AppFileType.APK,
+                        arch = "arm64-v8a",
+                        assetName = "app-release.apk",
+                        latestVersion = "v0.5.4",
+                        latestDownloadUrl = "https://example.com/app.apk",
+                        latestSizeBytes = 15_000_000L,
+                        downloadedVersion = "v0.5.4",
+                        installedVersion = "v0.5.4",
+                        isInstalled = true,
+                        localFilePath = "/data/data/com.ranzan.zbuilds/files/app.apk",
+                        hasUpdate = false,
+                        lastCheckedTimestamp = System.currentTimeMillis()
+                    )
+                ),
+                filteredApps = listOf(
+                    TrackedApp(
+                        id = "1",
+                        name = "ViMusic",
+                        sourceUrl = "https://github.com/vfsfitvnm/ViMusic",
+                        packageName = "it.vfsfitvnm.vimusic",
+                        fileType = AppFileType.APK,
+                        arch = "arm64-v8a",
+                        assetName = "app-release.apk",
+                        latestVersion = "v0.5.4",
+                        latestDownloadUrl = "https://example.com/app.apk",
+                        latestSizeBytes = 15_000_000L,
+                        downloadedVersion = "v0.5.4",
+                        installedVersion = "v0.5.4",
+                        isInstalled = true,
+                        localFilePath = "/data/data/com.ranzan.zbuilds/files/app.apk",
+                        hasUpdate = false,
+                        lastCheckedTimestamp = System.currentTimeMillis()
+                    )
+                )
+            )
+        )
+    }
 }

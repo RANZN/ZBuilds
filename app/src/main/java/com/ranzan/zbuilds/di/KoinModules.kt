@@ -35,73 +35,51 @@ import com.ranzan.zbuilds.domain.usecase.UpdateSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.ValidateGithubTokenUseCase
 import com.ranzan.zbuilds.ui.home.HomeViewModel
 import com.ranzan.zbuilds.ui.settings.SettingsViewModel
-import org.koin.android.ext.koin.androidContext
-import org.koin.core.module.dsl.viewModel
+import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.singleOf
+import org.koin.core.module.dsl.viewModelOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val appModule = module {
-    single { SettingsDataStore(androidContext()) }
-    single { GitHubApiService(get()) }
-    single { TrackedAppsDataStore(androidContext()) }
-    single { PackageInspectorImpl(androidContext()) }
-    single<PackageInspectorRepository> { get<PackageInspectorImpl>() }
-    single { AppDownloader(androidContext(), get(), get(), get()) }
-    single { CrashStorageDataSource(androidContext()) }
-    single<AnalyticsTracker> { AnalyticsTrackerImpl(androidContext(), get()) }
-    single { ZBuildsCrashHandler(get()) }
+    singleOf(::SettingsDataStore)
+    singleOf(::GitHubApiService)
+    singleOf(::TrackedAppsDataStore)
+    singleOf(::PackageInspectorImpl) bind PackageInspectorRepository::class
+    singleOf(::AppDownloader)
+    singleOf(::CrashStorageDataSource)
+    singleOf(::AnalyticsTrackerImpl) bind AnalyticsTracker::class
+    singleOf(::ZBuildsCrashHandler)
 }
 
 val repositoryModule = module {
-    single<AppRepository> { AppRepositoryImpl(get(), get(), get()) }
-    single<DownloaderRepository> { DownloaderRepositoryImpl(get()) }
-    single<SuggestionRepository> { SuggestionRepositoryImpl() }
-    single<SettingsRepository> { SettingsRepositoryImpl(androidContext(), get(), get()) }
+    singleOf(::AppRepositoryImpl) bind AppRepository::class
+    singleOf(::DownloaderRepositoryImpl) bind DownloaderRepository::class
+    singleOf(::SuggestionRepositoryImpl) bind SuggestionRepository::class
+    singleOf(::SettingsRepositoryImpl) bind SettingsRepository::class
 }
 
 val useCaseModule = module {
-    factory { GetTrackedAppsUseCase(get()) }
-    factory { AddTrackedAppUseCase(get()) }
-    factory { DeleteTrackedAppUseCase(get()) }
-    factory { FetchSourceReleasesUseCase(get()) }
-    factory { CheckAppUpdatesUseCase(get()) }
-    factory { DownloadAppUseCase(get()) }
-    factory { GetSourceSuggestionsUseCase(get()) }
-    factory { GetSettingsUseCase(get()) }
-    factory { UpdateSettingsUseCase(get()) }
-    factory { ValidateGithubTokenUseCase(get()) }
-    factory { ClearDownloadCacheUseCase(get()) }
-    factory { TrackEventUseCase(get()) }
-    factory { TrackCrashUseCase(get()) }
-    factory { GetCrashReportsUseCase(get()) }
-    factory { ClearCrashReportsUseCase(get()) }
+    factoryOf(::GetTrackedAppsUseCase)
+    factoryOf(::AddTrackedAppUseCase)
+    factoryOf(::DeleteTrackedAppUseCase)
+    factoryOf(::FetchSourceReleasesUseCase)
+    factoryOf(::CheckAppUpdatesUseCase)
+    factoryOf(::DownloadAppUseCase)
+    factoryOf(::GetSourceSuggestionsUseCase)
+    factoryOf(::GetSettingsUseCase)
+    factoryOf(::UpdateSettingsUseCase)
+    factoryOf(::ValidateGithubTokenUseCase)
+    factoryOf(::ClearDownloadCacheUseCase)
+    factoryOf(::TrackEventUseCase)
+    factoryOf(::TrackCrashUseCase)
+    factoryOf(::GetCrashReportsUseCase)
+    factoryOf(::ClearCrashReportsUseCase)
 }
 
 val viewModelModule = module {
-    viewModel {
-        HomeViewModel(
-            getTrackedAppsUseCase = get(),
-            addTrackedAppUseCase = get(),
-            deleteTrackedAppUseCase = get(),
-            fetchSourceReleasesUseCase = get(),
-            checkAppUpdatesUseCase = get(),
-            downloadAppUseCase = get(),
-            getSourceSuggestionsUseCase = get(),
-            getSettingsUseCase = get(),
-            trackEventUseCase = get()
-        )
-    }
-    viewModel {
-        SettingsViewModel(
-            getSettingsUseCase = get(),
-            updateSettingsUseCase = get(),
-            validateGithubTokenUseCase = get(),
-            clearDownloadCacheUseCase = get(),
-            getCrashReportsUseCase = get(),
-            clearCrashReportsUseCase = get(),
-            trackCrashUseCase = get(),
-            trackEventUseCase = get()
-        )
-    }
+    viewModelOf(::HomeViewModel)
+    viewModelOf(::SettingsViewModel)
 }
 
 val appModules = listOf(

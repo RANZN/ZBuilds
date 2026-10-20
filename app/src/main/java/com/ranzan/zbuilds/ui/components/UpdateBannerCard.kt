@@ -43,6 +43,7 @@ fun UpdateBannerCard(
     updateCount: Int,
     totalAppsCount: Int,
     isRefreshing: Boolean,
+    isDownloading: Boolean = false,
     onUpdateClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -72,11 +73,13 @@ fun UpdateBannerCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 val subtitle = when {
-                    updateCount > 0 -> "⚡ $updateCount update(s) available to install"
+                    isDownloading -> "⬇️ Downloading available updates..."
+                    updateCount > 0 -> "⚡ $updateCount update(s) available to download"
                     totalAppsCount == 0 -> "Add app sources to start tracking updates"
                     else -> "✓ All $totalAppsCount apps are up to date"
                 }
                 val subtitleColor = when {
+                    isDownloading -> AccentOrange
                     updateCount > 0 -> AccentOrange
                     totalAppsCount == 0 -> TextMuted
                     else -> AccentGreen
@@ -93,10 +96,10 @@ fun UpdateBannerCard(
 
             Button(
                 onClick = onUpdateClick,
-                enabled = !isRefreshing,
+                enabled = !isRefreshing && !isDownloading,
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (updateCount > 0) AccentOrange else GreenPrimary,
+                    containerColor = if (updateCount > 0 || isDownloading) AccentOrange else GreenPrimary,
                     contentColor = DarkBackground,
                     disabledContainerColor = DarkSurface,
                     disabledContentColor = TextMuted
@@ -114,6 +117,18 @@ fun UpdateBannerCard(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
+                } else if (isDownloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = DarkBackground
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Downloading...",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 } else {
                     Icon(
                         imageVector = if (updateCount > 0) Icons.Default.SystemUpdate else Icons.Default.Refresh,
@@ -122,7 +137,7 @@ fun UpdateBannerCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Update",
+                        text = if (updateCount > 0) "Update All" else "Update",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
