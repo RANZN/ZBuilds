@@ -1,15 +1,15 @@
 package com.ranzan.zbuilds.data.analytics
 
 import android.util.Log
-import com.ranzan.zbuilds.domain.repository.AnalyticsTracker
+import com.ranzan.zbuilds.domain.repository.CrashReporter
 
 /**
- * Global UncaughtExceptionHandler that intercepts crashes across all threads,
- * records structured crash diagnostics through AnalyticsTracker, and safely hands
+ * Global UncaughtExceptionHandler that intercepts uncaught exceptions across all threads,
+ * records structured crash diagnostics through CrashReporter, and safely hands
  * off to the platform's default handler.
  */
 class ZBuildsCrashHandler(
-    private val analyticsTracker: AnalyticsTracker
+    private val crashReporter: CrashReporter
 ) : Thread.UncaughtExceptionHandler {
 
     private var defaultHandler: Thread.UncaughtExceptionHandler? = null
@@ -23,7 +23,7 @@ class ZBuildsCrashHandler(
     @Suppress("DEPRECATION")
     override fun uncaughtException(thread: Thread, throwable: Throwable) {
         try {
-            analyticsTracker.trackCrash(
+            crashReporter.trackCrash(
                 throwable = throwable,
                 isFatal = true,
                 metadata = mapOf(

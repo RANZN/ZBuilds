@@ -1,3 +1,132 @@
 <resources>
     <string name="app_name">ZBuilds</string>
+
+    <!-- Top Bar & Search -->
+    <string name="home_search_placeholder">Search apps, modules, versions…</string>
+    <string name="home_btn_add">Add</string>
+    <string name="home_settings_desc">Settings</string>
+
+    <!-- Home Banner -->
+    <string name="home_banner_title">Install/Update apps</string>
+    <string name="home_banner_all_updated">✓ All %1$d apps are up to date</string>
+    <string name="home_banner_updates_available">⚡ %1$d update(s) available to download</string>
+    <string name="home_banner_no_apps">Add app sources to start tracking updates</string>
+    <string name="home_banner_downloading_updates">⬇️ Downloading available updates…</string>
+    <string name="home_btn_update">Update</string>
+    <string name="home_btn_update_all">Update All</string>
+    <string name="home_btn_checking">Checking…</string>
+    <string name="home_btn_downloading">Downloading…</string>
+
+    <!-- Home Section & Empty States -->
+    <string name="home_search_results_title">SEARCH RESULTS (%1$d)</string>
+    <string name="home_added_apps_title">ADDED APPS (%1$d)</string>
+    <string name="home_empty_title">No apps tracked yet</string>
+    <string name="home_empty_subtitle">Add a GitHub repository URL or release link using the + button to track APK or ZIP updates.</string>
+    <string name="home_empty_search_title">No apps matching \"%1$s\"</string>
+    <string name="home_empty_search_subtitle">Try searching for a different keyword or clear the search filter.</string>
+    <string name="home_empty_apps_title">No Apps Added Yet</string>
+    <string name="home_empty_apps_subtitle">Tap the (+ Add) button below to paste any GitHub repository link and choose the APK or ZIP build to track.</string>
+    <string name="home_action_add_desc">Add Source</string>
+    <string name="home_status_ready">Ready</string>
+    <string name="home_status_checking">Checking…</string>
+    <string name="home_status_downloading">Downloading</string>
+    <string name="home_msg_all_up_to_date">All tracked apps are up to date</string>
+    <string name="home_msg_checking_updates">Checking for available updates…</string>
+    <string name="home_msg_starting_downloads">Starting download for %1$d update(s)…</string>
+    <string name="home_msg_found_updates">Found %1$d update(s). Starting downloads…</string>
+
+    <!-- Tracked App Card -->
+    <string name="card_version_label">Version: %1$s • %2$s</string>
+    <string name="card_options_desc">Options</string>
+    <string name="card_menu_open">Open App</string>
+    <string name="card_menu_check_updates">Check Updates</string>
+    <string name="card_menu_remove">Remove from Tracked</string>
+    <string name="card_downloading">Downloading…</string>
+    <string name="card_update_available">Update Available: current %1$s → latest %2$s</string>
+    <string name="card_up_to_date">Up to date (%1$s)</string>
+    <string name="card_btn_cancel_download">Cancel Download</string>
+    <string name="card_btn_update_now">Update Now</string>
+    <string name="card_btn_install_apk">Install APK</string>
+    <string name="card_btn_download_apk">Download APK</string>
+    <string name="card_btn_open_app">Open App</string>
+    <string name="card_btn_flash_zip">Flash / Open ZIP</string>
+    <string name="card_btn_download_zip">Download ZIP</string>
+    <string name="card_btn_redownload">Re-download</string>
+
+    <!-- Add App Source Sheet -->
+    <string name="sheet_add_title">Add App Source</string>
+    <string name="sheet_add_subtitle">Enter any GitHub repo or release URL to discover available downloads</string>
+    <string name="sheet_input_placeholder">https://github.com/owner/repo/releases</string>
+    <string name="sheet_clear_desc">Clear</string>
+    <string name="sheet_paste_desc">Paste</string>
+    <string name="sheet_suggestions_label">Suggested Sources (tap to load):</string>
+    <string name="sheet_btn_fetch">Fetch Release Downloads</string>
+    <string name="sheet_btn_fetching">Fetching Releases…</string>
+    <string name="sheet_release_found_title">Release: %1$s (%2$d downloads found)</string>
+    <string name="sheet_select_instruction">Select what you want to download and add to home screen:</string>
+    <string name="sheet_download_desc">Download</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back_desc">Back</string>
+
+    <!-- Settings Section 1: GitHub API -->
+    <string name="settings_section_github">GitHub API Access</string>
+    <string name="settings_section_github_token">GitHub Token</string>
+    <string name="settings_github_desc">Optional Personal Access Token to bypass GitHub\'s 60 req/hr rate limits when checking releases and fetching assets:</string>
+    <string name="settings_btn_generate">Generate</string>
+    <string name="settings_btn_paste">Paste</string>
+    <string name="settings_token_placeholder">ghp_xxxxxxxxxxxx</string>
+    <string name="settings_token_show">Show token</string>
+    <string name="settings_token_hide">Hide token</string>
+    <string name="settings_token_active">✓ Token Saved &amp; Active</string>
+    <string name="settings_btn_save">Save</string>
+    <string name="settings_btn_test">Test</string>
+    <string name="settings_btn_remove">Remove Token</string>
+    <string name="settings_btn_clear">Clear</string>
+    <string name="settings_btn_dismiss">Dismiss</string>
+
+    <!-- Settings Section 2: Build Formats -->
+    <string name="settings_section_formats">Build Formats</string>
+    <string name="settings_formats_desc">Select which asset types you want visible across discovery and updates.</string>
+    <string name="settings_format_apks">APKs</string>
+    <string name="settings_format_apks_desc">Standard Android apps</string>
+    <string name="settings_format_modules">Modules</string>
+    <string name="settings_format_modules_desc">Root / Magisk zips</string>
+
+    <!-- Settings Section 3: Storage & Cleanup -->
+    <string name="settings_section_storage">Storage &amp; Cleanup</string>
+    <string name="settings_folder_label">Download Folder:</string>
+    <string name="settings_folder_default">Default: App Storage (Downloads/ZBuilds)</string>
+    <string name="settings_folder_permission_granted">✓ Permission Granted</string>
+    <string name="settings_btn_change_folder">Change Folder</string>
+    <string name="settings_btn_use_default">Use Default</string>
+    <string name="settings_auto_clean_title">Auto-Clean Older Versions</string>
+    <string name="settings_auto_clean_desc">Automatically deletes older versions of an app or module when a new build is downloaded.</string>
+    <string name="settings_retention_period_title">Auto-Cleanup Retention Period:</string>
+    <string name="settings_retention_1_day">1 Day</string>
+    <string name="settings_retention_7_days">7 Days</string>
+    <string name="settings_retention_30_days">30 Days</string>
+    <string name="settings_btn_clean_cache">Clean Cache / Storage</string>
+
+    <!-- Settings Section 4: Diagnostics & Crash Reports (FOSS Local) -->
+    <string name="settings_section_diagnostics">Diagnostics &amp; Crash Reports</string>
+    <string name="settings_diagnostics_desc">FOSS crash monitoring with 100% on-device local storage. No third-party analytics or proprietary trackers are included.</string>
+    <string name="settings_crash_monitoring_label">Crash Monitoring:</string>
+    <string name="settings_crash_monitoring_status">Active (Local Only)</string>
+    <string name="settings_crash_reports_stored">%1$d stored</string>
+    <string name="settings_crash_no_reports">No crash reports recorded. Everything is running smoothly.</string>
+    <string name="settings_btn_clear_crashes">Clear Reports</string>
+    <string name="settings_btn_report_github">Report on GitHub</string>
+    <string name="settings_btn_copy_log">Copy Log</string>
+    <string name="settings_btn_share_log">Share Log</string>
+    <string name="settings_crash_latest_title">Latest Crash: %1$s</string>
+    <string name="settings_crash_no_message">No error message</string>
+
+    <!-- Settings Section 5: About ZBuilds -->
+    <string name="settings_section_about">About ZBuilds</string>
+    <string name="settings_version_label">Version</string>
+    <string name="settings_project_link_title">Project Source &amp; Updates</string>
+    <string name="settings_project_link_desc">View code, report bugs, or request features on GitHub</string>
+    <string name="settings_open_browser_desc">Open in browser</string>
 </resources>

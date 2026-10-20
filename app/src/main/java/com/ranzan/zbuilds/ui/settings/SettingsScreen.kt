@@ -1,5 +1,6 @@
 package com.ranzan.zbuilds.ui.settings
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -65,16 +67,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ranzan.zbuilds.R
+import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppSettings
+import com.ranzan.zbuilds.domain.model.CrashReport
 import com.ranzan.zbuilds.ui.theme.AccentGreen
 import com.ranzan.zbuilds.ui.theme.AccentGreenContainer
 import com.ranzan.zbuilds.ui.theme.AccentGreenText
@@ -88,11 +96,15 @@ import com.ranzan.zbuilds.ui.theme.PureBlack
 import com.ranzan.zbuilds.ui.theme.TextMuted
 import com.ranzan.zbuilds.ui.theme.TextPrimary
 import com.ranzan.zbuilds.ui.theme.TextSecondary
+import com.ranzan.zbuilds.ui.theme.ZBuildsTheme
 import org.koin.androidx.compose.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Host composable for SettingsScreen managing ViewModel injection,
+ * collecting state, activity result launchers (folder picker), and one-shot effects.
+ */
 @Composable
-fun SettingsScreen(
+fun SettingsScreenHost(
     onNavigateBack: () -> Unit,
     viewModel: SettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier
@@ -100,14 +112,6 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var isTokenVisible by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(state.snackbarMessage) {
-        state.snackbarMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            viewModel.onEvent(SettingsUiEvent.OnClearSnackbar)
-        }
-    }
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -117,8 +121,8 @@ fun SettingsScreen(
                 val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 context.contentResolver.takePersistableUriPermission(treeUri, flags)
                 val doc = DocumentFile.fromTreeUri(context, treeUri)
-                viewModel.onEvent(
-                    SettingsUiEvent.OnFolderUpdated(
+                viewModel.onAction(
+                    SettingsUiAction.OnFolderUpdated(
                         uri = treeUri.toString(),
                         path = doc?.name ?: treeUri.lastPathSegment ?: "Custom Folder"
                     )
@@ -129,6 +133,82 @@ fun SettingsScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.uiEffect.collect { effect ->
+            when (effect) {
+                is SettingsUiEffect.NavigateBack -> onNavigateBack()
+                is SettingsUiEffect.OpenUrl -> {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, effect.url.toUri())
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                is SettingsUiEffect.LaunchFolderPicker -> {
+                    folderPickerLauncher.launch(null)
+                }
+                is SettingsUiEffect.RequestPasteToken -> {
+                    try {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
+                        if (!clip.isNullOrBlank()) {
+                            viewModel.onAction(SettingsUiAction.OnTokenInputChanged(clip))
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                is SettingsUiEffect.CopyToClipboard -> {
+                    try {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        clipboard?.setPrimaryClip(ClipData.newPlainText(effect.label, effect.text))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                is SettingsUiEffect.ShareText -> {
+                    try {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, effect.title)
+                            putExtra(Intent.EXTRA_TEXT, effect.text)
+                        }
+                        context.startActivity(Intent.createChooser(intent, effect.title))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                is SettingsUiEffect.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(effect.message)
+                }
+            }
+        }
+    }
+
+    SettingsScreen(
+        state = state,
+        snackbarHostState = snackbarHostState,
+        onAction = viewModel::onAction,
+        modifier = modifier
+    )
+}
+
+/**
+ * Pure UI Composable for Settings Screen.
+ * Contains zero hardcoded external URLs, zero Intent calls, and zero Android context dependencies
+ * so that Compose Previews function reliably.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(
+    state: SettingsUiState,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onAction: (SettingsUiAction) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var isTokenVisible by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = PureBlack,
@@ -136,7 +216,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Settings",
+                        text = stringResource(R.string.settings_title),
                         style = MaterialTheme.typography.titleLarge.copy(
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold
@@ -144,10 +224,10 @@ fun SettingsScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = { onAction(SettingsUiAction.OnNavigateBackClick) }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.settings_back_desc),
                             tint = TextPrimary
                         )
                     }
@@ -169,9 +249,9 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // Section 1: GitHub Token
-            SettingsSectionCard(title = "GitHub Token") {
+            SettingsSectionCard(title = stringResource(R.string.settings_section_github_token)) {
                 Text(
-                    text = "Optional Personal Access Token to bypass GitHub's 60 req/hr rate limits when checking releases and fetching assets:",
+                    text = stringResource(R.string.settings_github_desc),
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
 
@@ -183,15 +263,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = {
-                            try {
-                                val url = "https://github.com/settings/tokens/new?description=ZBuilds%20Android%20App&scopes=public_repo"
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        },
+                        onClick = { onAction(SettingsUiAction.OnGenerateTokenClick) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
                         border = BorderStroke(1.dp, DarkBorder),
@@ -199,26 +271,16 @@ fun SettingsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = "Generate",
+                            contentDescription = stringResource(R.string.settings_btn_generate),
                             modifier = Modifier.size(15.dp),
                             tint = AccentGreen
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Generate", fontSize = 13.sp)
+                        Text(stringResource(R.string.settings_btn_generate), fontSize = 13.sp)
                     }
 
                     OutlinedButton(
-                        onClick = {
-                            try {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
-                                if (!clip.isNullOrBlank()) {
-                                    viewModel.onEvent(SettingsUiEvent.OnTokenInputChanged(clip))
-                                }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        },
+                        onClick = { onAction(SettingsUiAction.OnPasteTokenClick) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
                         border = BorderStroke(1.dp, DarkBorder),
@@ -226,12 +288,12 @@ fun SettingsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentPaste,
-                            contentDescription = "Paste",
+                            contentDescription = stringResource(R.string.settings_btn_paste),
                             modifier = Modifier.size(15.dp),
                             tint = AccentGreen
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Paste", fontSize = 13.sp)
+                        Text(stringResource(R.string.settings_btn_paste), fontSize = 13.sp)
                     }
                 }
 
@@ -239,16 +301,16 @@ fun SettingsScreen(
 
                 OutlinedTextField(
                     value = state.tokenInput,
-                    onValueChange = { viewModel.onEvent(SettingsUiEvent.OnTokenInputChanged(it)) },
+                    onValueChange = { onAction(SettingsUiAction.OnTokenInputChanged(it)) },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("ghp_xxxxxxxxxxxx", color = TextMuted) },
+                    placeholder = { Text(stringResource(R.string.settings_token_placeholder), color = TextMuted) },
                     visualTransformation = if (isTokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         if (state.tokenInput.isNotEmpty()) {
                             IconButton(onClick = { isTokenVisible = !isTokenVisible }) {
                                 Icon(
                                     imageVector = if (isTokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (isTokenVisible) "Hide token" else "Show token",
+                                    contentDescription = stringResource(if (isTokenVisible) R.string.settings_token_hide else R.string.settings_token_show),
                                     tint = TextSecondary,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -276,14 +338,14 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "✓ Token Saved & Active",
+                            text = stringResource(R.string.settings_token_active),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = AccentGreenText,
                                 fontWeight = FontWeight.Bold
                             )
                         )
                         Text(
-                            text = "••••••••••••${state.settings.githubToken?.takeLast(4)}",
+                            text = "••••••••••••${state.settings.githubToken.takeLast(4)}",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
                                 fontFamily = FontFamily.Monospace
@@ -300,7 +362,7 @@ fun SettingsScreen(
                 ) {
                     Button(
                         onClick = {
-                            viewModel.onEvent(SettingsUiEvent.OnSaveToken)
+                            onAction(SettingsUiAction.OnSaveToken)
                             isTokenVisible = false
                         },
                         modifier = Modifier.weight(1f),
@@ -310,11 +372,11 @@ fun SettingsScreen(
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Save", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.settings_btn_save), fontWeight = FontWeight.Bold)
                     }
 
                     Button(
-                        onClick = { viewModel.onEvent(SettingsUiEvent.OnTestToken) },
+                        onClick = { onAction(SettingsUiAction.OnTestToken) },
                         enabled = !state.isValidatingToken && state.tokenInput.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = DarkSurfaceElevated,
@@ -329,21 +391,21 @@ fun SettingsScreen(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Text("Test")
+                            Text(stringResource(R.string.settings_btn_test))
                         }
                     }
 
                     if (state.settings.githubToken != null || state.tokenInput.isNotEmpty()) {
                         OutlinedButton(
                             onClick = {
-                                viewModel.onEvent(SettingsUiEvent.OnClearToken)
+                                onAction(SettingsUiAction.OnClearToken)
                                 isTokenVisible = false
                             },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
                             border = BorderStroke(1.dp, DarkBorder),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Clear")
+                            Text(stringResource(R.string.settings_btn_clear))
                         }
                     }
                 }
@@ -372,12 +434,12 @@ fun SettingsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(
-                                onClick = { viewModel.onEvent(SettingsUiEvent.OnDismissTokenFeedback) },
+                                onClick = { onAction(SettingsUiAction.OnDismissTokenFeedback) },
                                 modifier = Modifier.size(24.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Dismiss",
+                                    contentDescription = stringResource(R.string.settings_btn_dismiss),
                                     tint = if (state.isTokenValid) AccentGreenText else AccentRed,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -388,9 +450,9 @@ fun SettingsScreen(
             }
 
             // Section 2: Build Formats
-            SettingsSectionCard(title = "Build Formats") {
+            SettingsSectionCard(title = stringResource(R.string.settings_section_formats)) {
                 Text(
-                    text = "Select which build formats to display. If both are enabled, both APK and ZIP assets will be tracked:",
+                    text = stringResource(R.string.settings_formats_desc),
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
 
@@ -415,8 +477,8 @@ fun SettingsScreen(
                                 RoundedCornerShape(10.dp)
                             )
                             .clickable {
-                                viewModel.onEvent(
-                                    SettingsUiEvent.OnToggleBuildFormats(
+                                onAction(
+                                    SettingsUiAction.OnToggleBuildFormats(
                                         showApks = !showApks,
                                         showModules = showModules
                                     )
@@ -431,7 +493,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "APKs",
+                                    text = stringResource(R.string.settings_format_apks),
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         color = if (showApks) AccentGreenText else TextPrimary,
                                         fontWeight = FontWeight.Bold
@@ -443,7 +505,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Standard Android apps",
+                                text = stringResource(R.string.settings_format_apks_desc),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = if (showApks) TextSecondary else TextMuted
                                 )
@@ -463,8 +525,8 @@ fun SettingsScreen(
                                 RoundedCornerShape(10.dp)
                             )
                             .clickable {
-                                viewModel.onEvent(
-                                    SettingsUiEvent.OnToggleBuildFormats(
+                                onAction(
+                                    SettingsUiAction.OnToggleBuildFormats(
                                         showApks = showApks,
                                         showModules = !showModules
                                     )
@@ -479,7 +541,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Modules",
+                                    text = stringResource(R.string.settings_format_modules),
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         color = if (showModules) AccentGreenText else TextPrimary,
                                         fontWeight = FontWeight.Bold
@@ -491,7 +553,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Root / Magisk zips",
+                                text = stringResource(R.string.settings_format_modules_desc),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = if (showModules) TextSecondary else TextMuted
                                 )
@@ -502,19 +564,19 @@ fun SettingsScreen(
             }
 
             // Section 3: Storage & Cleanup
-            SettingsSectionCard(title = "Storage & Cleanup") {
+            SettingsSectionCard(title = stringResource(R.string.settings_section_storage)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Download Folder:",
+                        text = stringResource(R.string.settings_folder_label),
                         style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
                     )
                     if (state.settings.downloadFolderUri != null) {
                         Text(
-                            text = "✓ Permission Granted",
+                            text = stringResource(R.string.settings_folder_permission_granted),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = AccentGreenText,
                                 fontWeight = FontWeight.Bold
@@ -524,7 +586,7 @@ fun SettingsScreen(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = state.settings.downloadFolderPath ?: "Default: App Storage (Downloads/ZBuilds)",
+                    text = state.settings.downloadFolderPath ?: stringResource(R.string.settings_folder_default),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = if (state.settings.downloadFolderUri != null) AccentGreenText else TextPrimary,
                         fontWeight = FontWeight.Medium
@@ -538,7 +600,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
-                        onClick = { folderPickerLauncher.launch(null) },
+                        onClick = { onAction(SettingsUiAction.OnPickFolderClick) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AccentGreen,
@@ -552,13 +614,13 @@ fun SettingsScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Change Folder", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.settings_btn_change_folder), fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
                         onClick = {
-                            viewModel.onEvent(
-                                SettingsUiEvent.OnFolderUpdated(
+                            onAction(
+                                SettingsUiAction.OnFolderUpdated(
                                     uri = null,
                                     path = "Default: App Storage (Downloads/ZBuilds)"
                                 )
@@ -568,7 +630,7 @@ fun SettingsScreen(
                         border = BorderStroke(1.dp, DarkBorder),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Use Default")
+                        Text(stringResource(R.string.settings_btn_use_default))
                     }
                 }
 
@@ -586,7 +648,7 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Auto-Clean Old Versions",
+                            text = stringResource(R.string.settings_auto_clean_title),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = TextPrimary,
                                 fontWeight = FontWeight.Bold
@@ -594,7 +656,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Automatically delete previous APKs/modules when a new update finishes downloading.",
+                            text = stringResource(R.string.settings_auto_clean_desc),
                             style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
                         )
                     }
@@ -603,7 +665,7 @@ fun SettingsScreen(
 
                     Switch(
                         checked = state.settings.autoCleanOldVersions,
-                        onCheckedChange = { viewModel.onEvent(SettingsUiEvent.OnToggleAutoClean(it)) },
+                        onCheckedChange = { onAction(SettingsUiAction.OnToggleAutoClean(it)) },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = PureBlack,
                             checkedTrackColor = AccentGreen,
@@ -616,12 +678,16 @@ fun SettingsScreen(
                 if (state.settings.autoCleanOldVersions) {
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Auto-Cleanup Retention Period:",
+                        text = stringResource(R.string.settings_retention_period_title),
                         style = MaterialTheme.typography.labelMedium.copy(color = TextSecondary)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    val intervals = listOf(1 to "1 Day", 7 to "7 Days", 30 to "30 Days")
+                    val intervals = listOf(
+                        1 to stringResource(R.string.settings_retention_1_day),
+                        7 to stringResource(R.string.settings_retention_7_days),
+                        30 to stringResource(R.string.settings_retention_30_days)
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -639,7 +705,7 @@ fun SettingsScreen(
                                         RoundedCornerShape(8.dp)
                                     )
                                     .clickable {
-                                        viewModel.onEvent(SettingsUiEvent.OnSelectRetentionDays(days))
+                                        onAction(SettingsUiAction.OnSelectRetentionDays(days))
                                     }
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
@@ -660,7 +726,7 @@ fun SettingsScreen(
 
                 // Clean Cache / Storage Button
                 Button(
-                    onClick = { viewModel.onEvent(SettingsUiEvent.OnClearCache) },
+                    onClick = { onAction(SettingsUiAction.OnClearCache) },
                     enabled = !state.isClearingCache,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
@@ -684,15 +750,15 @@ fun SettingsScreen(
                             tint = AccentGreen
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Clean Cache / Storage", fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.settings_btn_clean_cache), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
 
-            // Section 4: Diagnostics & Crash Analytics
-            SettingsSectionCard(title = "Diagnostics & Crash Analytics") {
+            // Section 4: Diagnostics & Crash Reports (FOSS Local)
+            SettingsSectionCard(title = stringResource(R.string.settings_section_diagnostics)) {
                 Text(
-                    text = "Real-time crash tracking and exception diagnostics. Uncaught errors are captured with stack traces, breadcrumbs, and device telemetry to prevent regressions.",
+                    text = stringResource(R.string.settings_diagnostics_desc),
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
 
@@ -703,7 +769,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Crash Monitoring",
+                        text = stringResource(R.string.settings_crash_monitoring_label),
                         style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
                     )
                     Spacer(modifier = Modifier.weight(1f))
@@ -714,7 +780,7 @@ fun SettingsScreen(
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "Active",
+                            text = stringResource(R.string.settings_crash_monitoring_status),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = AccentGreenText,
                                 fontWeight = FontWeight.Bold
@@ -735,7 +801,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
                     )
                     Text(
-                        text = "${state.crashReports.size} stored",
+                        text = stringResource(R.string.settings_crash_reports_stored, state.crashReports.size),
                         style = MaterialTheme.typography.labelMedium.copy(
                             color = if (state.crashReports.isNotEmpty()) AccentOrange else TextSecondary,
                             fontWeight = FontWeight.Bold
@@ -743,75 +809,36 @@ fun SettingsScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { viewModel.onEvent(SettingsUiEvent.OnSimulateTestCrash) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                        border = BorderStroke(1.dp, DarkBorder),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.BugReport,
-                            contentDescription = "Test Tracker",
-                            tint = AccentOrange,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Test Tracker", fontSize = 13.sp)
-                    }
-
-                    if (state.crashReports.isNotEmpty()) {
-                        OutlinedButton(
-                            onClick = { viewModel.onEvent(SettingsUiEvent.OnClearCrashReports) },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
-                            border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Clear Reports",
-                                tint = AccentRed,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Clear Reports", fontSize = 13.sp)
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(10.dp))
 
                 if (state.crashReports.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                    val latest = state.crashReports.first()
+
+                    // Latest crash preview card
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .background(DarkSurfaceElevated)
-                            .padding(10.dp)
+                            .padding(12.dp)
                     ) {
-                        val latest = state.crashReports.first()
                         Text(
-                            text = "Latest: ${latest.exceptionClass.substringAfterLast('.')}",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            text = stringResource(R.string.settings_crash_latest_title, latest.exceptionClass.substringAfterLast('.')),
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = AccentRed,
                                 fontWeight = FontWeight.Bold
                             )
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = latest.message ?: "No error message",
-                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary),
+                            text = latest.message ?: stringResource(R.string.settings_crash_no_message),
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = latest.deviceInfo,
+                            text = "${latest.deviceInfo} • ${FormatHelper.formatDate(latest.timestamp)}",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
                                 fontSize = 10.sp
@@ -820,13 +847,100 @@ fun SettingsScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Action buttons: Report on GitHub (Primary) + Copy + Share + Clear
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { onAction(SettingsUiAction.OnReportCrashOnGithub(latest)) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AccentGreen,
+                                contentColor = PureBlack
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.BugReport,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.settings_btn_report_github), fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { onAction(SettingsUiAction.OnCopyCrashReport(latest)) },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            border = BorderStroke(1.dp, DarkBorder),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentPaste,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = AccentGreen
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.settings_btn_copy_log), fontSize = 13.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onAction(SettingsUiAction.OnShareCrashReport(latest)) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
+                            border = BorderStroke(1.dp, DarkBorder),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.settings_btn_share_log), fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = { onAction(SettingsUiAction.OnClearCrashReports) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
+                            border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = AccentRed
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.settings_btn_clear_crashes), fontSize = 12.sp)
+                        }
+                    }
+                } else {
+                    Text(
+                        text = stringResource(R.string.settings_crash_no_reports),
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
+                    )
                 }
             }
 
             // Section 5: About ZBuilds
-            SettingsSectionCard(title = "About ZBuilds") {
+            SettingsSectionCard(title = stringResource(R.string.settings_section_about)) {
                 Text(
-                    text = "${AppSettings.APP_DESCRIPTION}",
+                    text = AppSettings.APP_DESCRIPTION,
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
 
@@ -837,7 +951,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Version",
+                        text = stringResource(R.string.settings_version_label),
                         style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
                     )
                     Spacer(modifier = Modifier.weight(1f))
@@ -869,7 +983,7 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Clickable Project URL Row
+                // Clickable Project URL Row (Screen delegates to onAction, no direct URI/Intent calls)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -877,12 +991,7 @@ fun SettingsScreen(
                         .background(DarkSurfaceElevated)
                         .border(1.dp, DarkBorder, RoundedCornerShape(10.dp))
                         .clickable {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppSettings.DEFAULT_PROJECT_URL))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
+                            onAction(SettingsUiAction.OnOpenProjectUrlClick)
                         }
                         .padding(12.dp)
                 ) {
@@ -892,14 +1001,14 @@ fun SettingsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Link,
-                            contentDescription = "Project Link",
+                            contentDescription = stringResource(R.string.settings_project_link_title),
                             tint = AccentGreen,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Project Source & Updates",
+                                text = stringResource(R.string.settings_project_link_title),
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     color = TextPrimary,
                                     fontWeight = FontWeight.Bold
@@ -912,7 +1021,7 @@ fun SettingsScreen(
                         }
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = "Open in browser",
+                            contentDescription = stringResource(R.string.settings_open_browser_desc),
                             tint = TextSecondary,
                             modifier = Modifier.size(16.dp)
                         )
@@ -945,5 +1054,34 @@ private fun SettingsSectionCard(
         )
         Spacer(modifier = Modifier.height(10.dp))
         content()
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsScreenPreview() {
+    ZBuildsTheme {
+        SettingsScreen(
+            state = SettingsUiState(
+                settings = AppSettings(
+                    githubToken = "ghp_mocktoken123456",
+                    showApks = true,
+                    showModules = true
+                ),
+                crashReports = listOf(
+                    CrashReport(
+                        id = "test-1",
+                        timestamp = System.currentTimeMillis(),
+                        exceptionClass = "java.lang.IllegalStateException",
+                        message = "Sample crash message for preview",
+                        stackTrace = "java.lang.IllegalStateException: Sample crash\n\tat com.ranzan.zbuilds...",
+                        threadName = "main",
+                        deviceInfo = "Google Pixel 8 (Android 14, API 34)",
+                        appVersion = "1.0.0",
+                        isFatal = false
+                    )
+                )
+            )
+        )
     }
 }

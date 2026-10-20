@@ -9,8 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import com.ranzan.zbuilds.ui.home.HomeScreen
-import com.ranzan.zbuilds.ui.settings.SettingsScreen
+import com.ranzan.zbuilds.ui.home.HomeScreenHost
+import com.ranzan.zbuilds.ui.settings.SettingsScreenHost
 import com.ranzan.zbuilds.ui.theme.ZBuildsTheme
 
 class MainActivity : ComponentActivity() {
@@ -27,12 +27,12 @@ class MainActivity : ComponentActivity() {
 
                 when (currentScreen) {
                     "home" -> {
-                        HomeScreen(
+                        HomeScreenHost(
                             onSettingsClick = { currentScreen = "settings" }
                         )
                     }
                     "settings" -> {
-                        SettingsScreen(
+                        SettingsScreenHost(
                             onNavigateBack = { currentScreen = "home" }
                         )
                     }

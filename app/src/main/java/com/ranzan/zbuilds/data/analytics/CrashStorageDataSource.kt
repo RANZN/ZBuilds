@@ -18,9 +18,9 @@ import java.io.File
  * Thread-safe local storage data source for persisting, loading, and pruning crash diagnostic reports.
  */
 class CrashStorageDataSource(
-    private val context: Context,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val context: Context
 ) {
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
     private val mutex = Mutex()
     private val reportsDir by lazy {
         File(context.filesDir, "crash_reports").apply {

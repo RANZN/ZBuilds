@@ -29,13 +29,13 @@ class AppDownloader(
     private val context: Context,
     private val trackedAppsDataStore: TrackedAppsDataStore,
     private val packageInspector: PackageInspectorRepository,
-    private val settingsDataStore: SettingsDataStore? = null,
+    private val settingsDataStore: SettingsDataStore? = null
+) {
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
-) {
     private val progressFlows = ConcurrentHashMap<String, MutableStateFlow<DownloadProgress>>()
     private val activeJobs = ConcurrentHashMap<String, Job>()
 

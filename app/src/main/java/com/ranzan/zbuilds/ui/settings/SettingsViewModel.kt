@@ -1,21 +1,17 @@
 package com.ranzan.zbuilds.ui.settings
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ranzan.zbuilds.core.base.BaseViewModel
+import com.ranzan.zbuilds.core.utils.CrashReportHelper
 import com.ranzan.zbuilds.core.utils.FormatHelper
+import com.ranzan.zbuilds.domain.model.AppSettings
 import com.ranzan.zbuilds.domain.usecase.ClearCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.ClearDownloadCacheUseCase
 import com.ranzan.zbuilds.domain.usecase.GetCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
-import com.ranzan.zbuilds.domain.usecase.TrackCrashUseCase
-import com.ranzan.zbuilds.domain.usecase.TrackEventUseCase
 import com.ranzan.zbuilds.domain.usecase.UpdateSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.ValidateGithubTokenUseCase
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
@@ -24,27 +20,25 @@ class SettingsViewModel(
     private val validateGithubTokenUseCase: ValidateGithubTokenUseCase,
     private val clearDownloadCacheUseCase: ClearDownloadCacheUseCase,
     private val getCrashReportsUseCase: GetCrashReportsUseCase,
-    private val clearCrashReportsUseCase: ClearCrashReportsUseCase,
-    private val trackCrashUseCase: TrackCrashUseCase,
-    private val trackEventUseCase: TrackEventUseCase
-) : ViewModel() {
+    private val clearCrashReportsUseCase: ClearCrashReportsUseCase
+) : BaseViewModel<SettingsUiState, SettingsUiAction, SettingsUiEffect>(SettingsUiState()) {
 
-    private val _uiState = MutableStateFlow(SettingsUiState())
-    val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    companion object {
+        const val GITHUB_GENERATE_TOKEN_URL = "https://github.com/settings/tokens/new?description=ZBuilds%20Android%20App&scopes=public_repo"
+    }
 
     init {
         observeSettings()
         observeCrashReports()
-        trackEventUseCase("settings_screen_opened")
     }
 
     private fun observeSettings() {
         viewModelScope.launch {
             getSettingsUseCase().collectLatest { settings ->
-                _uiState.update { current ->
-                    current.copy(
+                setState {
+                    copy(
                         settings = settings,
-                        tokenInput = if (current.tokenInput.isEmpty()) settings.githubToken.orEmpty() else current.tokenInput
+                        tokenInput = if (tokenInput.isEmpty()) settings.githubToken.orEmpty() else tokenInput
                     )
                 }
             }
@@ -54,47 +48,47 @@ class SettingsViewModel(
     private fun observeCrashReports() {
         viewModelScope.launch {
             getCrashReportsUseCase().collectLatest { reports ->
-                _uiState.update { it.copy(crashReports = reports) }
+                setState { copy(crashReports = reports) }
             }
         }
     }
 
-    fun onEvent(event: SettingsUiEvent) {
-        when (event) {
-            is SettingsUiEvent.OnTokenInputChanged -> {
-                _uiState.update { it.copy(tokenInput = event.token) }
+    override fun onAction(action: SettingsUiAction) {
+        when (action) {
+            is SettingsUiAction.OnTokenInputChanged -> {
+                setState { copy(tokenInput = action.token) }
             }
 
-            is SettingsUiEvent.OnSaveToken -> {
-                val token = _uiState.value.tokenInput.trim().ifBlank { null }
+            is SettingsUiAction.OnSaveToken -> {
+                val token = currentState.tokenInput.trim().ifBlank { null }
                 viewModelScope.launch {
                     updateSettingsUseCase.updateGithubToken(token)
-                    trackEventUseCase("token_saved", mapOf("has_token" to (token != null).toString()))
-                    _uiState.update {
-                        it.copy(snackbarMessage = if (token != null) "GitHub token saved" else "GitHub token cleared")
-                    }
+                    val msg = if (token != null) "GitHub token saved" else "GitHub token cleared"
+                    setState { copy(snackbarMessage = msg) }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
 
-            is SettingsUiEvent.OnClearToken -> {
+            is SettingsUiAction.OnClearToken -> {
                 viewModelScope.launch {
                     updateSettingsUseCase.updateGithubToken(null)
-                    trackEventUseCase("token_cleared")
-                    _uiState.update {
-                        it.copy(
+                    val msg = "GitHub token removed"
+                    setState {
+                        copy(
                             tokenInput = "",
                             tokenValidationMessage = null,
-                            snackbarMessage = "GitHub token removed"
+                            snackbarMessage = msg
                         )
                     }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
 
-            is SettingsUiEvent.OnTestToken -> {
-                val token = _uiState.value.tokenInput.trim()
+            is SettingsUiAction.OnTestToken -> {
+                val token = currentState.tokenInput.trim()
                 if (token.isBlank()) {
-                    _uiState.update {
-                        it.copy(
+                    setState {
+                        copy(
                             tokenValidationMessage = "Please enter a token first to test.",
                             isTokenValid = false
                         )
@@ -103,13 +97,12 @@ class SettingsViewModel(
                 }
 
                 viewModelScope.launch {
-                    _uiState.update { it.copy(isValidatingToken = true, tokenValidationMessage = null) }
-                    trackEventUseCase("token_tested")
+                    setState { copy(isValidatingToken = true, tokenValidationMessage = null) }
                     val result = validateGithubTokenUseCase(token)
                     result.fold(
                         onSuccess = { message ->
-                            _uiState.update {
-                                it.copy(
+                            setState {
+                                copy(
                                     isValidatingToken = false,
                                     tokenValidationMessage = message,
                                     isTokenValid = true
@@ -117,8 +110,8 @@ class SettingsViewModel(
                             }
                         },
                         onFailure = { error ->
-                            _uiState.update {
-                                it.copy(
+                            setState {
+                                copy(
                                     isValidatingToken = false,
                                     tokenValidationMessage = error.message ?: "Validation failed",
                                     isTokenValid = false
@@ -129,102 +122,133 @@ class SettingsViewModel(
                 }
             }
 
-            is SettingsUiEvent.OnDismissTokenFeedback -> {
-                _uiState.update { it.copy(tokenValidationMessage = null) }
+            is SettingsUiAction.OnDismissTokenFeedback -> {
+                setState { copy(tokenValidationMessage = null) }
             }
 
-            is SettingsUiEvent.OnToggleBuildFormats -> {
-                if (!event.showApks && !event.showModules) {
-                    _uiState.update {
-                        it.copy(snackbarMessage = "At least one format (APKs or Modules) must remain selected.")
-                    }
+            is SettingsUiAction.OnToggleBuildFormats -> {
+                if (!action.showApks && !action.showModules) {
+                    val msg = "At least one format (APKs or Modules) must remain selected."
+                    setState { copy(snackbarMessage = msg) }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                     return
                 }
 
                 viewModelScope.launch {
-                    updateSettingsUseCase.updateBuildFormats(event.showApks, event.showModules)
-                    trackEventUseCase("build_formats_toggled", mapOf("apks" to event.showApks.toString(), "modules" to event.showModules.toString()))
-                    _uiState.update { it.copy(snackbarMessage = "Build formats updated") }
+                    updateSettingsUseCase.updateBuildFormats(action.showApks, action.showModules)
+                    val msg = "Build formats updated"
+                    setState { copy(snackbarMessage = msg) }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
 
-            is SettingsUiEvent.OnFolderUpdated -> {
+            is SettingsUiAction.OnFolderUpdated -> {
                 viewModelScope.launch {
-                    updateSettingsUseCase.updateStorageFolder(event.uri, event.path)
-                    trackEventUseCase("storage_folder_changed", mapOf("custom" to (event.uri != null).toString()))
-                    val msg = if (event.uri != null) "Download folder updated: ${event.path}" else "Reset to default app storage"
-                    _uiState.update { it.copy(snackbarMessage = msg) }
+                    updateSettingsUseCase.updateStorageFolder(action.uri, action.path)
+                    val msg = if (action.uri != null) "Download folder updated: ${action.path}" else "Reset to default app storage"
+                    setState { copy(snackbarMessage = msg) }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
 
-            is SettingsUiEvent.OnToggleAutoClean -> {
+            is SettingsUiAction.OnToggleAutoClean -> {
                 viewModelScope.launch {
-                    updateSettingsUseCase.updateAutoClean(event.enabled)
-                    trackEventUseCase("auto_clean_toggled", mapOf("enabled" to event.enabled.toString()))
-                    val msg = if (event.enabled) "Auto-clean old versions enabled" else "Auto-clean disabled"
-                    _uiState.update { it.copy(snackbarMessage = msg) }
+                    updateSettingsUseCase.updateAutoClean(action.enabled)
+                    val msg = if (action.enabled) "Auto-clean old versions enabled" else "Auto-clean disabled"
+                    setState { copy(snackbarMessage = msg) }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
 
-            is SettingsUiEvent.OnSelectRetentionDays -> {
+            is SettingsUiAction.OnSelectRetentionDays -> {
                 viewModelScope.launch {
-                    updateSettingsUseCase.updateCleanupRetentionDays(event.days)
-                    trackEventUseCase("retention_days_changed", mapOf("days" to event.days.toString()))
-                    _uiState.update {
-                        it.copy(snackbarMessage = "Cleanup retention set to ${event.days} days")
-                    }
+                    updateSettingsUseCase.updateCleanupRetentionDays(action.days)
+                    val msg = "Cleanup retention set to ${action.days} days"
+                    setState { copy(snackbarMessage = msg) }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
 
-            is SettingsUiEvent.OnClearCache -> {
+            is SettingsUiAction.OnClearCache -> {
                 viewModelScope.launch {
-                    _uiState.update { it.copy(isClearingCache = true) }
-                    trackEventUseCase("storage_cache_cleared")
+                    setState { copy(isClearingCache = true) }
                     val result = clearDownloadCacheUseCase()
                     result.fold(
                         onSuccess = { freedBytes ->
                             val readable = FormatHelper.formatBytes(freedBytes)
-                            _uiState.update {
-                                it.copy(
+                            val msg = "Cleaned storage: $readable freed"
+                            setState {
+                                copy(
                                     isClearingCache = false,
-                                    snackbarMessage = "Cleaned storage: $readable freed"
+                                    snackbarMessage = msg
                                 )
                             }
+                            sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                         },
                         onFailure = { error ->
-                            _uiState.update {
-                                it.copy(
+                            val msg = "Failed to clean storage: ${error.message}"
+                            setState {
+                                copy(
                                     isClearingCache = false,
-                                    snackbarMessage = "Failed to clean storage: ${error.message}"
+                                    snackbarMessage = msg
                                 )
                             }
+                            sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                         }
                     )
                 }
             }
 
-            is SettingsUiEvent.OnClearCrashReports -> {
+            is SettingsUiAction.OnClearCrashReports -> {
                 viewModelScope.launch {
                     clearCrashReportsUseCase()
-                    trackEventUseCase("crash_reports_cleared")
-                    _uiState.update { it.copy(snackbarMessage = "Crash reports cleared") }
+                    val msg = "Local crash reports cleared"
+                    setState { copy(snackbarMessage = msg) }
+                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
 
-            is SettingsUiEvent.OnSimulateTestCrash -> {
-                viewModelScope.launch {
-                    trackCrashUseCase(
-                        throwable = IllegalStateException("Test Diagnostic Crash generated from Settings"),
-                        isFatal = false,
-                        metadata = mapOf("source" to "settings_diagnostics_ui")
-                    )
-                    _uiState.update { it.copy(snackbarMessage = "Diagnostic test crash recorded successfully") }
-                }
+            is SettingsUiAction.OnReportCrashOnGithub -> {
+                val url = CrashReportHelper.createGithubIssueUrl(action.report)
+                sendEffect(SettingsUiEffect.OpenUrl(url))
             }
 
-            is SettingsUiEvent.OnClearSnackbar -> {
-                _uiState.update { it.copy(snackbarMessage = null) }
+            is SettingsUiAction.OnCopyCrashReport -> {
+                val markdown = CrashReportHelper.formatReportAsMarkdown(action.report)
+                sendEffect(SettingsUiEffect.CopyToClipboard("Crash Report", markdown))
+                sendEffect(SettingsUiEffect.ShowSnackbar("Crash report copied to clipboard"))
+            }
+
+            is SettingsUiAction.OnShareCrashReport -> {
+                val markdown = CrashReportHelper.formatReportAsMarkdown(action.report)
+                sendEffect(SettingsUiEffect.ShareText("ZBuilds Crash Report", markdown))
+            }
+
+            is SettingsUiAction.OnClearSnackbar -> {
+                setState { copy(snackbarMessage = null) }
+            }
+
+            is SettingsUiAction.OnNavigateBackClick -> {
+                sendEffect(SettingsUiEffect.NavigateBack)
+            }
+
+            is SettingsUiAction.OnGenerateTokenClick -> {
+                sendEffect(SettingsUiEffect.OpenUrl(GITHUB_GENERATE_TOKEN_URL))
+            }
+
+            is SettingsUiAction.OnOpenProjectUrlClick -> {
+                sendEffect(SettingsUiEffect.OpenUrl(AppSettings.DEFAULT_PROJECT_URL))
+            }
+
+            is SettingsUiAction.OnPickFolderClick -> {
+                sendEffect(SettingsUiEffect.LaunchFolderPicker)
+            }
+
+            is SettingsUiAction.OnPasteTokenClick -> {
+                sendEffect(SettingsUiEffect.RequestPasteToken)
             }
         }
     }
+
+    fun onEvent(event: SettingsUiEvent) = onAction(event)
 }

@@ -1,5 +1,8 @@
 package com.ranzan.zbuilds.ui.home
 
+import com.ranzan.zbuilds.core.base.UiAction
+import com.ranzan.zbuilds.core.base.UiEffect
+import com.ranzan.zbuilds.core.base.UiState
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
@@ -23,23 +26,40 @@ data class HomeUiState(
     val fetchedRelease: SourceRelease? = null,
     val addSourceError: String? = null,
     val statusMessage: String? = null
-) {
+) : UiState {
     val updateCount: Int
         get() = trackedApps.count { it.hasUpdate }
 }
 
-sealed interface HomeUiEvent {
-    data class OnSearchQueryChange(val query: String) : HomeUiEvent
-    data object OnRefresh : HomeUiEvent
-    data object OnOpenAddSheet : HomeUiEvent
-    data object OnCloseAddSheet : HomeUiEvent
-    data class OnSourceUrlChange(val url: String) : HomeUiEvent
-    data object OnFetchSourceReleases : HomeUiEvent
-    data class OnSelectAssetToTrack(val asset: ReleaseAsset, val release: SourceRelease, val customName: String? = null) : HomeUiEvent
-    data class OnDownloadApp(val app: TrackedApp) : HomeUiEvent
-    data class OnCancelDownload(val appId: String) : HomeUiEvent
-    data class OnDeleteTrackedApp(val appId: String) : HomeUiEvent
-    data object OnCheckAllUpdates : HomeUiEvent
-    data object OnClearStatusMessage : HomeUiEvent
-    data object OnSettingsClick : HomeUiEvent
+sealed interface HomeUiAction : UiAction {
+    data class OnSearchQueryChange(val query: String) : HomeUiAction
+    data object OnRefresh : HomeUiAction
+    data object OnOpenAddSheet : HomeUiAction
+    data object OnCloseAddSheet : HomeUiAction
+    data class OnSourceUrlChange(val url: String) : HomeUiAction
+    data object OnFetchSourceReleases : HomeUiAction
+    data class OnSelectAssetToTrack(val asset: ReleaseAsset, val release: SourceRelease, val customName: String? = null) : HomeUiAction
+    data class OnDownloadApp(val app: TrackedApp) : HomeUiAction
+    data class OnCancelDownload(val appId: String) : HomeUiAction
+    data class OnDeleteTrackedApp(val appId: String) : HomeUiAction
+    data object OnCheckAllUpdates : HomeUiAction
+    data object OnUpdateAll : HomeUiAction
+    data object OnResume : HomeUiAction
+    data object OnClearStatusMessage : HomeUiAction
+    data object OnSettingsClick : HomeUiAction
+
+    // App Actions (delegated to effect handler in host)
+    data class OnInstallApp(val localFilePath: String) : HomeUiAction
+    data class OnOpenApp(val packageName: String) : HomeUiAction
+    data class OnShareZip(val localFilePath: String) : HomeUiAction
+}
+
+typealias HomeUiEvent = HomeUiAction
+
+sealed interface HomeUiEffect : UiEffect {
+    data object NavigateToSettings : HomeUiEffect
+    data class ShowSnackbar(val message: String) : HomeUiEffect
+    data class InstallApk(val filePath: String) : HomeUiEffect
+    data class OpenApp(val packageName: String) : HomeUiEffect
+    data class OpenOrShareZip(val filePath: String) : HomeUiEffect
 }
