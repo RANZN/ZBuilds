@@ -15,13 +15,13 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class GitHubApiService(
-    private val settingsDataStore: SettingsDataStore? = null,
+    private val settingsDataStore: SettingsDataStore? = null
+) {
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
-) {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
