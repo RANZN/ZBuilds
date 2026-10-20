@@ -1,7 +1,7 @@
 package com.ranzan.zbuilds.ui.home
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ranzan.zbuilds.core.base.BaseViewModel
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
@@ -16,11 +16,6 @@ import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
-import com.ranzan.zbuilds.domain.usecase.TrackEventUseCase
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -32,23 +27,17 @@ class HomeViewModel(
     private val checkAppUpdatesUseCase: CheckAppUpdatesUseCase,
     private val downloadAppUseCase: DownloadAppUseCase,
     private val getSourceSuggestionsUseCase: GetSourceSuggestionsUseCase,
-    private val getSettingsUseCase: GetSettingsUseCase,
-    private val trackEventUseCase: TrackEventUseCase
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(HomeUiState())
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val getSettingsUseCase: GetSettingsUseCase
+) : BaseViewModel<HomeUiState, HomeUiAction, HomeUiEffect>(HomeUiState()) {
 
     init {
-        trackEventUseCase("home_screen_opened")
-
         // Collect tracked apps from DataStore
         viewModelScope.launch {
             getTrackedAppsUseCase().collect { apps ->
-                _uiState.update { state ->
-                    state.copy(
+                setState {
+                    copy(
                         trackedApps = apps,
-                        filteredApps = filterApps(apps, state.searchQuery, state.showApks, state.showModules)
+                        filteredApps = filterApps(apps, searchQuery, showApks, showModules)
                     )
                 }
             }
@@ -57,20 +46,20 @@ class HomeViewModel(
         // Collect user settings to apply build format filtering dynamically
         viewModelScope.launch {
             getSettingsUseCase().collect { settings ->
-                _uiState.update { state ->
-                    state.copy(
+                setState {
+                    copy(
                         showApks = settings.showApks,
                         showModules = settings.showModules,
-                        filteredApps = filterApps(state.trackedApps, state.searchQuery, settings.showApks, settings.showModules)
+                        filteredApps = filterApps(trackedApps, searchQuery, settings.showApks, settings.showModules)
                     )
                 }
             }
         }
 
-        // Collect source suggestions from repository (configured for Remote Config)
+        // Collect source suggestions from repository
         viewModelScope.launch {
             getSourceSuggestionsUseCase().collect { suggestions ->
-                _uiState.update { it.copy(suggestions = suggestions) }
+                setState { copy(suggestions = suggestions) }
             }
         }
 
@@ -78,37 +67,37 @@ class HomeViewModel(
         checkForUpdates(silent = true)
     }
 
-    fun onEvent(event: HomeUiEvent) {
-        when (event) {
-            is HomeUiEvent.OnSearchQueryChange -> {
-                _uiState.update { state ->
-                    state.copy(
-                        searchQuery = event.query,
-                        filteredApps = filterApps(state.trackedApps, event.query, state.showApks, state.showModules)
+    override fun onAction(action: HomeUiAction) {
+        when (action) {
+            is HomeUiAction.OnSearchQueryChange -> {
+                setState {
+                    copy(
+                        searchQuery = action.query,
+                        filteredApps = filterApps(trackedApps, action.query, showApks, showModules)
                     )
                 }
             }
-            is HomeUiEvent.OnRefresh -> {
-                trackEventUseCase("manual_refresh_triggered")
+            is HomeUiAction.OnRefresh -> {
                 checkForUpdates(silent = false)
             }
-            is HomeUiEvent.OnCheckAllUpdates -> {
-                trackEventUseCase("check_all_updates_clicked")
-                checkForUpdates(silent = false)
+            is HomeUiAction.OnCheckAllUpdates, is HomeUiAction.OnUpdateAll -> {
+                downloadAllAvailableUpdates()
             }
-            is HomeUiEvent.OnOpenAddSheet -> {
-                trackEventUseCase("add_app_sheet_opened")
-                _uiState.update {
-                    it.copy(
+            is HomeUiAction.OnResume -> {
+                checkForUpdates(silent = true)
+            }
+            is HomeUiAction.OnOpenAddSheet -> {
+                setState {
+                    copy(
                         isAddSheetOpen = true,
                         addSourceError = null,
                         fetchedRelease = null
                     )
                 }
             }
-            is HomeUiEvent.OnCloseAddSheet -> {
-                _uiState.update {
-                    it.copy(
+            is HomeUiAction.OnCloseAddSheet -> {
+                setState {
+                    copy(
                         isAddSheetOpen = false,
                         addSourceUrl = "",
                         isFetchingSource = false,
@@ -117,49 +106,60 @@ class HomeViewModel(
                     )
                 }
             }
-            is HomeUiEvent.OnSourceUrlChange -> {
-                _uiState.update {
-                    it.copy(
-                        addSourceUrl = event.url,
+            is HomeUiAction.OnSourceUrlChange -> {
+                setState {
+                    copy(
+                        addSourceUrl = action.url,
                         addSourceError = null
                     )
                 }
             }
-            is HomeUiEvent.OnFetchSourceReleases -> {
+            is HomeUiAction.OnFetchSourceReleases -> {
                 fetchSourceReleases()
             }
-            is HomeUiEvent.OnSelectAssetToTrack -> {
-                trackAndDownloadAsset(event.asset, event.release, event.customName)
+            is HomeUiAction.OnSelectAssetToTrack -> {
+                trackAndDownloadAsset(action.asset, action.release, action.customName)
             }
-            is HomeUiEvent.OnDownloadApp -> {
-                startDownload(event.app)
+            is HomeUiAction.OnDownloadApp -> {
+                startDownload(action.app)
             }
-            is HomeUiEvent.OnCancelDownload -> {
+            is HomeUiAction.OnCancelDownload -> {
                 viewModelScope.launch {
-                    downloadAppUseCase.cancelDownload(event.appId)
-                    trackEventUseCase("download_cancelled", mapOf("app_id" to event.appId))
+                    downloadAppUseCase.cancelDownload(action.appId)
                 }
             }
-            is HomeUiEvent.OnDeleteTrackedApp -> {
+            is HomeUiAction.OnDeleteTrackedApp -> {
                 viewModelScope.launch {
-                    deleteTrackedAppUseCase(event.appId)
-                    trackEventUseCase("app_deleted", mapOf("app_id" to event.appId))
-                    _uiState.update { it.copy(statusMessage = "App removed from tracked list") }
+                    deleteTrackedAppUseCase(action.appId)
+                    val msg = "App removed from tracked list"
+                    setState { copy(statusMessage = msg) }
+                    sendEffect(HomeUiEffect.ShowSnackbar(msg))
                 }
             }
-            is HomeUiEvent.OnClearStatusMessage -> {
-                _uiState.update { it.copy(statusMessage = null) }
+            is HomeUiAction.OnClearStatusMessage -> {
+                setState { copy(statusMessage = null) }
             }
-            is HomeUiEvent.OnSettingsClick -> {
-                // Handled in UI navigation
+            is HomeUiAction.OnSettingsClick -> {
+                sendEffect(HomeUiEffect.NavigateToSettings)
+            }
+            is HomeUiAction.OnInstallApp -> {
+                sendEffect(HomeUiEffect.InstallApk(action.localFilePath))
+            }
+            is HomeUiAction.OnOpenApp -> {
+                sendEffect(HomeUiEffect.OpenApp(action.packageName))
+            }
+            is HomeUiAction.OnShareZip -> {
+                sendEffect(HomeUiEffect.OpenOrShareZip(action.localFilePath))
             }
         }
     }
 
+    fun onEvent(event: HomeUiEvent) = onAction(event)
+
     private fun checkForUpdates(silent: Boolean) {
         viewModelScope.launch {
             if (!silent) {
-                _uiState.update { it.copy(isRefreshing = true, statusMessage = "Checking for updates...") }
+                setState { copy(isRefreshing = true, statusMessage = "Checking for updates...") }
             }
 
             val result = checkAppUpdatesUseCase()
@@ -174,47 +174,109 @@ class HomeViewModel(
                     null
                 }
 
-                _uiState.update {
-                    it.copy(
+                setState {
+                    copy(
                         isRefreshing = false,
                         statusMessage = message
                     )
                 }
+                if (message != null && !silent) {
+                    sendEffect(HomeUiEffect.ShowSnackbar(message))
+                }
             } else {
-                _uiState.update {
-                    it.copy(
+                val errorMsg = if (!silent) "Failed to check updates: ${result.exceptionOrNull()?.message}" else null
+                setState {
+                    copy(
                         isRefreshing = false,
-                        statusMessage = if (!silent) "Failed to check updates: ${result.exceptionOrNull()?.message}" else null
+                        statusMessage = errorMsg
                     )
+                }
+                if (errorMsg != null) {
+                    sendEffect(HomeUiEffect.ShowSnackbar(errorMsg))
+                }
+            }
+        }
+    }
+
+    private fun downloadAllAvailableUpdates() {
+        val appsToUpdate = currentState.trackedApps.filter { it.hasUpdate }
+        if (appsToUpdate.isNotEmpty()) {
+            val msg = "Starting download for ${appsToUpdate.size} update(s)..."
+            setState { copy(statusMessage = msg) }
+            sendEffect(HomeUiEffect.ShowSnackbar(msg))
+            appsToUpdate.forEach { app ->
+                if (currentState.downloadProgressMap[app.id] !is DownloadProgress.Downloading) {
+                    startDownload(app)
+                }
+            }
+        } else {
+            viewModelScope.launch {
+                setState { copy(isRefreshing = true, statusMessage = "Checking for available updates...") }
+                val result = checkAppUpdatesUseCase()
+                if (result.isSuccess) {
+                    val updatedApps = result.getOrNull().orEmpty()
+                    val newUpdates = updatedApps.filter { it.hasUpdate }
+                    if (newUpdates.isNotEmpty()) {
+                        val msg = "Found ${newUpdates.size} update(s). Starting downloads..."
+                        setState {
+                            copy(
+                                isRefreshing = false,
+                                statusMessage = msg
+                            )
+                        }
+                        sendEffect(HomeUiEffect.ShowSnackbar(msg))
+                        newUpdates.forEach { app ->
+                            if (currentState.downloadProgressMap[app.id] !is DownloadProgress.Downloading) {
+                                startDownload(app)
+                            }
+                        }
+                    } else {
+                        val msg = "All tracked apps are up to date"
+                        setState {
+                            copy(
+                                isRefreshing = false,
+                                statusMessage = msg
+                            )
+                        }
+                        sendEffect(HomeUiEffect.ShowSnackbar(msg))
+                    }
+                } else {
+                    val errorMsg = "Failed to check updates: ${result.exceptionOrNull()?.message}"
+                    setState {
+                        copy(
+                            isRefreshing = false,
+                            statusMessage = errorMsg
+                        )
+                    }
+                    sendEffect(HomeUiEffect.ShowSnackbar(errorMsg))
                 }
             }
         }
     }
 
     private fun fetchSourceReleases() {
-        val url = _uiState.value.addSourceUrl.trim()
+        val url = currentState.addSourceUrl.trim()
         if (url.isBlank()) {
-            _uiState.update { it.copy(addSourceError = "Please enter a GitHub repository URL") }
+            setState { copy(addSourceError = "Please enter a GitHub repository URL") }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isFetchingSource = true, addSourceError = null) }
-            trackEventUseCase("fetch_source_releases", mapOf("url" to url))
+            setState { copy(isFetchingSource = true, addSourceError = null) }
 
             val result = fetchSourceReleasesUseCase(url)
             if (result.isSuccess) {
                 val release = result.getOrNull()
-                _uiState.update {
-                    it.copy(
+                setState {
+                    copy(
                         isFetchingSource = false,
                         fetchedRelease = release,
                         addSourceError = if (release?.assets.isNullOrEmpty()) "No APK or ZIP assets found in this release" else null
                     )
                 }
             } else {
-                _uiState.update {
-                    it.copy(
+                setState {
+                    copy(
                         isFetchingSource = false,
                         addSourceError = result.exceptionOrNull()?.message ?: "Failed to fetch repository release"
                     )
@@ -234,7 +296,7 @@ class HomeViewModel(
         val newApp = TrackedApp(
             id = UUID.randomUUID().toString(),
             name = appName,
-            sourceUrl = _uiState.value.addSourceUrl.trim(),
+            sourceUrl = currentState.addSourceUrl.trim(),
             packageName = null,
             fileType = asset.fileType,
             arch = asset.arch,
@@ -252,24 +314,18 @@ class HomeViewModel(
 
         viewModelScope.launch {
             addTrackedAppUseCase(newApp)
-            trackEventUseCase(
-                "app_tracked",
-                mapOf(
-                    "name" to appName,
-                    "file_type" to asset.fileType.name,
-                    "version" to release.tag
-                )
-            )
 
+            val msg = "Added $appName to tracked apps"
             // Close sheet and give feedback
-            _uiState.update {
-                it.copy(
+            setState {
+                copy(
                     isAddSheetOpen = false,
                     addSourceUrl = "",
                     fetchedRelease = null,
-                    statusMessage = "Added $appName to tracked apps"
+                    statusMessage = msg
                 )
             }
+            sendEffect(HomeUiEffect.ShowSnackbar(msg))
 
             // Immediately start downloading the selected asset
             startDownload(newApp)
@@ -278,14 +334,12 @@ class HomeViewModel(
 
     private fun startDownload(app: TrackedApp) {
         viewModelScope.launch {
-            trackEventUseCase("download_started", mapOf("app_id" to app.id, "app_name" to app.name))
-
             // Observe progress flow
             val progressJob = launch {
                 downloadAppUseCase.observeProgress(app.id).collect { progress ->
-                    _uiState.update { state ->
-                        state.copy(
-                            downloadProgressMap = state.downloadProgressMap + (app.id to progress)
+                    setState {
+                        copy(
+                            downloadProgressMap = downloadProgressMap + (app.id to progress)
                         )
                     }
                 }
@@ -296,18 +350,19 @@ class HomeViewModel(
 
             progressJob.cancel()
 
-            _uiState.update { state ->
-                state.copy(
-                    downloadProgressMap = state.downloadProgressMap - app.id,
-                    statusMessage = if (result.isSuccess) {
-                        trackEventUseCase("download_completed", mapOf("app_id" to app.id, "app_name" to app.name))
-                        "Downloaded ${app.name} (${app.latestVersion})"
-                    } else {
-                        trackEventUseCase("download_failed", mapOf("app_id" to app.id, "error" to (result.exceptionOrNull()?.message ?: "unknown")))
-                        "Download failed: ${result.exceptionOrNull()?.message}"
-                    }
+            val msg = if (result.isSuccess) {
+                "Downloaded ${app.name} (${app.latestVersion})"
+            } else {
+                "Download failed: ${result.exceptionOrNull()?.message}"
+            }
+
+            setState {
+                copy(
+                    downloadProgressMap = downloadProgressMap - app.id,
+                    statusMessage = msg
                 )
             }
+            sendEffect(HomeUiEffect.ShowSnackbar(msg))
         }
     }
 

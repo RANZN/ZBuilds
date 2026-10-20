@@ -109,7 +109,22 @@
     <string name="settings_retention_30_days">30 Days</string>
     <string name="settings_btn_clean_cache">Clean Cache / Storage</string>
 
-    <!-- Settings Section 4: About ZBuilds -->
+    <!-- Settings Section 4: Diagnostics & Crash Reports (FOSS Local) -->
+    <string name="settings_section_diagnostics">Diagnostics &amp; Crash Reports</string>
+    <string name="settings_diagnostics_desc">FOSS crash monitoring with 100% on-device local storage. No third-party analytics or proprietary trackers are included.</string>
+    <string name="settings_crash_monitoring_label">Crash Monitoring:</string>
+    <string name="settings_crash_monitoring_status">Active (Local Only)</string>
+    <string name="settings_crash_reports_stored">%1$d stored</string>
+    <string name="settings_crash_no_reports">No crash reports recorded. Everything is running smoothly.</string>
+    <string name="settings_btn_test_crash">Simulate Test Crash</string>
+    <string name="settings_btn_clear_crashes">Clear Reports</string>
+    <string name="settings_btn_report_github">Report on GitHub</string>
+    <string name="settings_btn_copy_log">Copy Log</string>
+    <string name="settings_btn_share_log">Share Log</string>
+    <string name="settings_crash_latest_title">Latest Crash: %1$s</string>
+    <string name="settings_crash_no_message">No error message</string>
+
+    <!-- Settings Section 5: About ZBuilds -->
     <string name="settings_section_about">About ZBuilds</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_project_link_title">Project Source &amp; Updates</string>

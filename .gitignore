@@ -13,3 +13,7 @@ local.properties
 *.apk
 *.aab
 
+# Firebase & Secrets
+google-services.json
+**/google-services.json
+
