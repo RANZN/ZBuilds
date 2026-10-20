@@ -49,17 +49,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import com.ranzan.zbuilds.core.utils.BuildVariant
-import com.ranzan.zbuilds.core.utils.BuildVariantHelper
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
-import com.ranzan.zbuilds.ui.theme.AccentBlue
 import com.ranzan.zbuilds.ui.theme.AccentGreen
 import com.ranzan.zbuilds.ui.theme.AccentOrange
 import com.ranzan.zbuilds.ui.theme.AccentPurple
@@ -170,80 +166,12 @@ fun TrackedAppCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = app.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = TextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-
-                        // File Type Pill (APK or ZIP)
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = if (app.fileType == AppFileType.APK) AccentBlue.copy(alpha = 0.2f) else AccentOrange.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = app.fileType.displayName,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (app.fileType == AppFileType.APK) AccentBlue else AccentOrange
-                            )
-                        }
-
-                        // Architecture Pill
-                        Box(
-                            modifier = Modifier
-                                .background(DarkSurfaceElevated, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = app.arch,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = TextSecondary
-                            )
-                        }
-
-                        // Build Variant Pill (Debug or Release) - only if data available
-                        val variant = remember(app.assetName, app.packageName, app.isInstalled, app.localFilePath) {
-                            BuildVariantHelper.detectAppVariant(
-                                context = context,
-                                packageName = app.packageName,
-                                isInstalled = app.isInstalled,
-                                localFilePath = app.localFilePath,
-                                assetName = app.assetName,
-                                downloadUrl = app.latestDownloadUrl
-                            )
-                        }
-                        if (variant != null) {
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = if (variant == BuildVariant.DEBUG) AccentOrange.copy(alpha = 0.2f) else AccentGreen.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = variant.displayName,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (variant == BuildVariant.DEBUG) AccentOrange else AccentGreen
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = app.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = TextPrimary
+                    )
 
                     Spacer(modifier = Modifier.height(2.dp))
 
