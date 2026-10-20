@@ -934,25 +934,6 @@ fun SettingsScreen(
                         text = stringResource(R.string.settings_crash_no_reports),
                         style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
                     )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedButton(
-                        onClick = { onAction(SettingsUiAction.OnSimulateTestCrash) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                        border = BorderStroke(1.dp, DarkBorder),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.BugReport,
-                            contentDescription = null,
-                            tint = AccentOrange,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.settings_btn_test_crash), fontSize = 13.sp)
-                    }
                 }
             }
 

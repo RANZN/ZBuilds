@@ -32,7 +32,6 @@ sealed interface SettingsUiAction : UiAction {
 
     // Local Crash Reporting actions (FOSS)
     data object OnClearCrashReports : SettingsUiAction
-    data object OnSimulateTestCrash : SettingsUiAction
     data class OnReportCrashOnGithub(val report: CrashReport) : SettingsUiAction
     data class OnCopyCrashReport(val report: CrashReport) : SettingsUiAction
     data class OnShareCrashReport(val report: CrashReport) : SettingsUiAction

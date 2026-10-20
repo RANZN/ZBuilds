@@ -9,7 +9,6 @@ import com.ranzan.zbuilds.domain.usecase.ClearCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.ClearDownloadCacheUseCase
 import com.ranzan.zbuilds.domain.usecase.GetCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
-import com.ranzan.zbuilds.domain.usecase.TrackCrashUseCase
 import com.ranzan.zbuilds.domain.usecase.UpdateSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.ValidateGithubTokenUseCase
 import kotlinx.coroutines.flow.collectLatest
@@ -21,8 +20,7 @@ class SettingsViewModel(
     private val validateGithubTokenUseCase: ValidateGithubTokenUseCase,
     private val clearDownloadCacheUseCase: ClearDownloadCacheUseCase,
     private val getCrashReportsUseCase: GetCrashReportsUseCase,
-    private val clearCrashReportsUseCase: ClearCrashReportsUseCase,
-    private val trackCrashUseCase: TrackCrashUseCase
+    private val clearCrashReportsUseCase: ClearCrashReportsUseCase
 ) : BaseViewModel<SettingsUiState, SettingsUiAction, SettingsUiEffect>(SettingsUiState()) {
 
     companion object {
@@ -205,19 +203,6 @@ class SettingsViewModel(
                 viewModelScope.launch {
                     clearCrashReportsUseCase()
                     val msg = "Local crash reports cleared"
-                    setState { copy(snackbarMessage = msg) }
-                    sendEffect(SettingsUiEffect.ShowSnackbar(msg))
-                }
-            }
-
-            is SettingsUiAction.OnSimulateTestCrash -> {
-                viewModelScope.launch {
-                    trackCrashUseCase(
-                        throwable = IllegalStateException("Test Diagnostic Crash generated from Settings (FOSS Local Crash Reporting)"),
-                        isFatal = false,
-                        metadata = mapOf("source" to "settings_local_crash_ui")
-                    )
-                    val msg = "Diagnostic test crash recorded locally"
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
