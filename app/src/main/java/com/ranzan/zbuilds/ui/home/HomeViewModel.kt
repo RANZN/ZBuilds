@@ -124,6 +124,9 @@ class HomeViewModel(
             is HomeUiAction.OnDownloadApp -> {
                 startDownload(action.app)
             }
+            is HomeUiAction.OnCheckAppUpdate -> {
+                checkSingleAppUpdate(action.app)
+            }
             is HomeUiAction.OnCancelDownload -> {
                 viewModelScope.launch {
                     downloadAppUseCase.cancelDownload(action.appId)
@@ -199,6 +202,30 @@ class HomeViewModel(
                     sendEffect(HomeUiEffect.ShowSnackbar(errorMsg))
                 }
             }
+        }
+    }
+
+    /**
+     * Checks one tracked app for a newer release without starting any download.
+     */
+    private fun checkSingleAppUpdate(app: TrackedApp) {
+        viewModelScope.launch {
+            setState { copy(isRefreshing = true, statusMessage = "Checking ${app.name} for updates...") }
+
+            val result = checkAppUpdatesUseCase.checkSingleApp(app)
+            val message = if (result.isSuccess) {
+                val updatedApp = result.getOrThrow()
+                if (updatedApp.hasUpdate) {
+                    "Update available for ${updatedApp.name} (${updatedApp.latestVersion})"
+                } else {
+                    "${updatedApp.name} is up to date"
+                }
+            } else {
+                "Failed to check updates: ${result.exceptionOrNull()?.message}"
+            }
+
+            setState { copy(isRefreshing = false, statusMessage = message) }
+            sendEffect(HomeUiEffect.ShowSnackbar(message))
         }
     }
 

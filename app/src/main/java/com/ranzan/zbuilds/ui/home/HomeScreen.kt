@@ -276,6 +276,7 @@ fun HomeScreen(
                             app = app,
                             downloadProgress = state.downloadProgressMap[app.id],
                             onDownloadClick = { onAction(HomeUiAction.OnDownloadApp(app)) },
+                            onCheckUpdateClick = { onAction(HomeUiAction.OnCheckAppUpdate(app)) },
                             onCancelDownloadClick = { onAction(HomeUiAction.OnCancelDownload(app.id)) },
                             onInstallClick = {
                                 app.localFilePath?.let { path ->

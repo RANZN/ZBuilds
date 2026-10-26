@@ -77,6 +77,7 @@ fun TrackedAppCard(
     app: TrackedApp,
     downloadProgress: DownloadProgress?,
     onDownloadClick: () -> Unit,
+    onCheckUpdateClick: () -> Unit = {},
     onCancelDownloadClick: () -> Unit,
     onInstallClick: () -> Unit,
     onOpenClick: () -> Unit,
@@ -237,7 +238,7 @@ fun TrackedAppCard(
                             text = { Text(stringResource(R.string.card_menu_check_updates)) },
                             onClick = {
                                 showMenu = false
-                                onDownloadClick()
+                                onCheckUpdateClick()
                             },
                             leadingIcon = {
                                 Icon(Icons.Default.SystemUpdate, contentDescription = null)

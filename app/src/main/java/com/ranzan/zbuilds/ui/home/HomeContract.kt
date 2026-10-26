@@ -43,6 +43,7 @@ sealed interface HomeUiAction : UiAction {
     data class OnCancelDownload(val appId: String) : HomeUiAction
     data class OnDeleteTrackedApp(val appId: String) : HomeUiAction
     data object OnCheckAllUpdates : HomeUiAction
+    data class OnCheckAppUpdate(val app: TrackedApp) : HomeUiAction
     data object OnUpdateAll : HomeUiAction
     data object OnResume : HomeUiAction
     data object OnClearStatusMessage : HomeUiAction
