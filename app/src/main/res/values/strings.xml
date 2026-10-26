@@ -66,6 +66,8 @@
     <string name="sheet_release_found_title">Release: %1$s (%2$d downloads found)</string>
     <string name="sheet_select_instruction">Select what you want to download and add to home screen:</string>
     <string name="sheet_download_desc">Download</string>
+    <string name="badge_variant_debug">Debug</string>
+    <string name="badge_variant_release">Release</string>
 
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
