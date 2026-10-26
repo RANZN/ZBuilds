@@ -2,6 +2,7 @@ package com.ranzan.zbuilds.ui.home
 
 import androidx.lifecycle.viewModelScope
 import com.ranzan.zbuilds.core.base.BaseViewModel
+import com.ranzan.zbuilds.core.utils.AssetMatcher
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
@@ -304,6 +305,7 @@ class HomeViewModel(
             fileType = asset.fileType,
             arch = asset.arch,
             assetName = asset.name,
+            assetPattern = AssetMatcher.toPattern(asset.name, release.tag),
             latestVersion = release.tag,
             latestDownloadUrl = asset.downloadUrl,
             latestSizeBytes = asset.sizeBytes,

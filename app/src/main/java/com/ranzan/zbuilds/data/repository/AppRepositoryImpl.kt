@@ -1,11 +1,11 @@
 package com.ranzan.zbuilds.data.repository
 
-import com.ranzan.zbuilds.core.utils.ArchitectureHelper
+import com.ranzan.zbuilds.core.utils.AssetMatcher
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.data.local.TrackedAppsDataStore
 import com.ranzan.zbuilds.data.remote.GitHubApiService
 import com.ranzan.zbuilds.data.remote.SourceUrlParser
-import com.ranzan.zbuilds.domain.model.AppFileType
+import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
 import com.ranzan.zbuilds.domain.model.TrackedApp
 import com.ranzan.zbuilds.domain.repository.AppRepository
@@ -84,11 +84,16 @@ class AppRepositoryImpl(
                         val cleanInstalled = installedVersion?.let { FormatHelper.cleanVersionString(it) }
 
                         // Has update if latest is different from downloaded, or different from installed
-                        val hasUpdate = (cleanLatest != cleanDownloaded && cleanDownloaded.isNotBlank()) ||
-                                (cleanInstalled != null && cleanLatest != cleanInstalled)
+                        // Only flag an update when the tracked file exists in the new release,
+                        // otherwise the download would fetch a stale or unrelated file
+                        val hasUpdate = matchedAsset != null && (
+                                (cleanLatest != cleanDownloaded && cleanDownloaded.isNotBlank()) ||
+                                (cleanInstalled != null && cleanLatest != cleanInstalled))
 
                         val updatedApp = app.copy(
                             latestVersion = latestTag,
+                            assetName = matchedAsset?.name ?: app.assetName,
+                            assetPattern = matchedAsset?.let { AssetMatcher.toPattern(it.name, it.releaseTag) } ?: app.assetPattern,
                             latestDownloadUrl = matchedAsset?.downloadUrl ?: app.latestDownloadUrl,
                             latestSizeBytes = matchedAsset?.sizeBytes ?: app.latestSizeBytes,
                             isInstalled = isInstalled,
@@ -148,11 +153,14 @@ class AppRepositoryImpl(
 
             val cleanInstalled = installedVersion?.let { FormatHelper.cleanVersionString(it) }
 
-            val hasUpdate = (cleanLatest != cleanDownloaded && cleanDownloaded.isNotBlank()) ||
-                    (cleanInstalled != null && cleanLatest != cleanInstalled)
+            val hasUpdate = matchedAsset != null && (
+                    (cleanLatest != cleanDownloaded && cleanDownloaded.isNotBlank()) ||
+                    (cleanInstalled != null && cleanLatest != cleanInstalled))
 
             val updatedApp = app.copy(
                 latestVersion = latestTag,
+                assetName = matchedAsset?.name ?: app.assetName,
+                assetPattern = matchedAsset?.let { AssetMatcher.toPattern(it.name, it.releaseTag) } ?: app.assetPattern,
                 latestDownloadUrl = matchedAsset?.downloadUrl ?: app.latestDownloadUrl,
                 latestSizeBytes = matchedAsset?.sizeBytes ?: app.latestSizeBytes,
                 isInstalled = isInstalled,
@@ -167,27 +175,13 @@ class AppRepositoryImpl(
         }
     }
 
-    private fun findMatchingAsset(app: TrackedApp, release: SourceRelease): com.ranzan.zbuilds.domain.model.ReleaseAsset? {
-        val sameTypeAssets = release.assets.filter { it.fileType == app.fileType }
-        if (sameTypeAssets.isEmpty()) return null
-
-        // 1. Try matching by exact asset name if filename doesn't contain version
-        val exactMatch = sameTypeAssets.firstOrNull { it.name.equals(app.assetName, ignoreCase = true) }
-        if (exactMatch != null) return exactMatch
-
-        // 2. Try matching by normalized base name and architecture
-        val appBaseName = FormatHelper.deriveAppNameFromAsset(app.assetName).lowercase()
-        val archMatches = sameTypeAssets.filter { asset ->
-            val assetBaseName = FormatHelper.deriveAppNameFromAsset(asset.name).lowercase()
-            assetBaseName == appBaseName && asset.arch.equals(app.arch, ignoreCase = true)
-        }
-        if (archMatches.isNotEmpty()) return archMatches.first()
-
-        // 3. Match by architecture among matching file type
-        val archOnlyMatches = sameTypeAssets.filter { it.arch.equals(app.arch, ignoreCase = true) }
-        if (archOnlyMatches.isNotEmpty()) return archOnlyMatches.first()
-
-        // 4. Fallback to first compatible asset
-        return sameTypeAssets.firstOrNull { ArchitectureHelper.isArchCompatible(it.arch) } ?: sameTypeAssets.first()
-    }
+    private fun findMatchingAsset(app: TrackedApp, release: SourceRelease): ReleaseAsset? =
+        AssetMatcher.findMatchingAsset(
+            trackedAssetName = app.assetName,
+            trackedPattern = app.assetPattern,
+            trackedVersion = app.downloadedVersion.ifBlank { null },
+            fileType = app.fileType,
+            arch = app.arch,
+            assets = release.assets
+        )
 }
