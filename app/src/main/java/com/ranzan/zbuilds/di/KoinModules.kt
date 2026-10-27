@@ -1,5 +1,8 @@
 package com.ranzan.zbuilds.di
 
+import com.ranzan.zbuilds.core.utils.AndroidStringProvider
+import com.ranzan.zbuilds.core.utils.CrashReportHelper
+import com.ranzan.zbuilds.core.utils.StringProvider
 import com.ranzan.zbuilds.data.analytics.CrashReporterImpl
 import com.ranzan.zbuilds.data.analytics.CrashStorageDataSource
 import com.ranzan.zbuilds.data.analytics.ZBuildsCrashHandler
@@ -49,6 +52,8 @@ val appModule = module {
     singleOf(::CrashStorageDataSource)
     singleOf(::CrashReporterImpl) bind CrashReporter::class
     singleOf(::ZBuildsCrashHandler)
+    singleOf(::AndroidStringProvider) bind StringProvider::class
+    singleOf(::CrashReportHelper)
 }
 
 val repositoryModule = module {

@@ -3,10 +3,11 @@ package com.ranzan.zbuilds.data.analytics
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.domain.model.CrashReport
 import com.ranzan.zbuilds.domain.repository.CrashReporter
-import kotlinx.coroutines.flow.Flow
 import java.util.UUID
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Concrete implementation of CrashReporter capturing structured runtime exception
@@ -28,15 +29,20 @@ class CrashReporterImpl(
         val stackTrace = Log.getStackTraceString(throwable)
         val threadName = Thread.currentThread().name
 
-        val deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL} " +
-                "(Android ${Build.VERSION.RELEASE}, API ${Build.VERSION.SDK_INT}, " +
-                "ABI: ${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"})"
+        val deviceInfo = context.getString(
+            R.string.crash_device_info,
+            Build.MANUFACTURER,
+            Build.MODEL,
+            Build.VERSION.RELEASE,
+            Build.VERSION.SDK_INT,
+            Build.SUPPORTED_ABIS.firstOrNull() ?: context.getString(R.string.common_unknown)
+        )
 
         val appVersion = try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.0"
+            pInfo.versionName ?: context.getString(R.string.common_unknown)
         } catch (_: Exception) {
-            "1.0.0"
+            context.getString(R.string.common_unknown)
         }
 
         val report = CrashReport(

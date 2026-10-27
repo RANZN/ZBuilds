@@ -215,6 +215,35 @@
     <string name="common_unknown">Unknown</string>
     <string name="settings_check_mark">✓</string>
 
+    <!-- Source Suggestions -->
+    <string name="suggestion_revanced_label">ReVanced Modules</string>
+    <string name="suggestion_revanced_desc">Pre-built ReVanced Magisk / KernelSU modules</string>
+    <string name="suggestion_microg_label">MicroG-RE</string>
+    <string name="suggestion_microg_desc">MicroG Revanced Edition APK releases</string>
+    <string name="suggestion_spotube_label">Spotube</string>
+    <string name="suggestion_spotube_desc">Open-source Spotify client</string>
+    <string name="suggestion_newpipe_label">NewPipe</string>
+    <string name="suggestion_newpipe_desc">Lightweight YouTube frontend</string>
+
+    <!-- Crash Report (copied, shared or posted as a GitHub issue) -->
+    <string name="crash_report_title">ZBuilds Crash Report</string>
+    <string name="crash_issue_title">[Crash] %1$s: %2$s</string>
+    <string name="crash_issue_heading">Crash Report (Auto-generated)</string>
+    <string name="crash_issue_intro">A crash was captured locally in ZBuilds.</string>
+    <string name="crash_issue_truncated">… [truncated for URL length]</string>
+    <string name="crash_uncaught_exception">Uncaught Exception</string>
+    <string name="crash_section_environment">Environment</string>
+    <string name="crash_section_exception">Exception</string>
+    <string name="crash_section_stack_trace">Stack Trace</string>
+    <string name="crash_section_breadcrumbs">Breadcrumbs</string>
+    <string name="crash_section_recent_breadcrumbs">Recent Breadcrumbs</string>
+    <string name="crash_label_app_version">App Version</string>
+    <string name="crash_label_device">Device</string>
+    <string name="crash_label_fatal">Fatal</string>
+    <string name="crash_label_thread">Thread</string>
+    <string name="crash_label_date">Date</string>
+    <string name="crash_device_info">%1$s %2$s (Android %3$s, API %4$d, ABI: %5$s)</string>
+
     <!-- Errors -->
     <string name="error_invalid_source_url">Invalid GitHub repository URL</string>
     <string name="error_no_releases">No releases found in this repository</string>

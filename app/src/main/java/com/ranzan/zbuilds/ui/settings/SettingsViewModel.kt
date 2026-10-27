@@ -23,7 +23,8 @@ class SettingsViewModel(
     private val validateGithubTokenUseCase: ValidateGithubTokenUseCase,
     private val clearDownloadCacheUseCase: ClearDownloadCacheUseCase,
     private val getCrashReportsUseCase: GetCrashReportsUseCase,
-    private val clearCrashReportsUseCase: ClearCrashReportsUseCase
+    private val clearCrashReportsUseCase: ClearCrashReportsUseCase,
+    private val crashReportHelper: CrashReportHelper
 ) : BaseViewModel<SettingsUiState, SettingsUiAction, SettingsUiEffect>(SettingsUiState()) {
 
     companion object {
@@ -225,18 +226,18 @@ class SettingsViewModel(
             }
 
             is SettingsUiAction.OnReportCrashOnGithub -> {
-                val url = CrashReportHelper.createGithubIssueUrl(action.report)
+                val url = crashReportHelper.createGithubIssueUrl(action.report)
                 sendEffect(SettingsUiEffect.OpenUrl(url))
             }
 
             is SettingsUiAction.OnCopyCrashReport -> {
-                val markdown = CrashReportHelper.formatReportAsMarkdown(action.report)
+                val markdown = crashReportHelper.formatReportAsMarkdown(action.report)
                 sendEffect(SettingsUiEffect.CopyToClipboard(UiText.res(R.string.settings_crash_clipboard_label), markdown))
                 sendEffect(SettingsUiEffect.ShowSnackbar(UiText.res(R.string.settings_msg_crash_copied)))
             }
 
             is SettingsUiAction.OnShareCrashReport -> {
-                val markdown = CrashReportHelper.formatReportAsMarkdown(action.report)
+                val markdown = crashReportHelper.formatReportAsMarkdown(action.report)
                 sendEffect(SettingsUiEffect.ShareText(UiText.res(R.string.settings_crash_share_title), markdown))
             }
 

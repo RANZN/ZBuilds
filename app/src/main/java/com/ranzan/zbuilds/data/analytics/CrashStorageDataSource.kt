@@ -1,7 +1,9 @@
 package com.ranzan.zbuilds.data.analytics
 
 import android.content.Context
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.domain.model.CrashReport
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -12,7 +14,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 
 /**
  * Thread-safe local storage data source for persisting, loading, and pruning crash diagnostic reports.
@@ -22,6 +23,7 @@ class CrashStorageDataSource(
 ) {
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
     private val mutex = Mutex()
+    private val unknownText by lazy { context.getString(R.string.common_unknown) }
     private val reportsDir by lazy {
         File(context.filesDir, "crash_reports").apply {
             if (!exists()) mkdirs()
@@ -124,9 +126,9 @@ class CrashStorageDataSource(
                 exceptionClass = json.getString("exceptionClass"),
                 message = json.optString("message").ifEmpty { null },
                 stackTrace = json.getString("stackTrace"),
-                threadName = json.optString("threadName", "Unknown"),
-                deviceInfo = json.optString("deviceInfo", "Unknown"),
-                appVersion = json.optString("appVersion", "1.0.0"),
+                threadName = json.optString("threadName", unknownText),
+                deviceInfo = json.optString("deviceInfo", unknownText),
+                appVersion = json.optString("appVersion", unknownText),
                 isFatal = json.optBoolean("isFatal", true),
                 breadcrumbs = breadcrumbs,
                 metadata = metadata
