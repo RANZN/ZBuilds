@@ -3,6 +3,7 @@ package com.ranzan.zbuilds.ui.settings
 import com.ranzan.zbuilds.core.base.UiAction
 import com.ranzan.zbuilds.core.base.UiEffect
 import com.ranzan.zbuilds.core.base.UiState
+import com.ranzan.zbuilds.core.base.UiText
 import com.ranzan.zbuilds.domain.model.AppSettings
 import com.ranzan.zbuilds.domain.model.CrashReport
 
@@ -10,10 +11,10 @@ data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
     val tokenInput: String = "",
     val isValidatingToken: Boolean = false,
-    val tokenValidationMessage: String? = null,
+    val tokenValidationMessage: UiText? = null,
     val isTokenValid: Boolean = false,
     val isClearingCache: Boolean = false,
-    val snackbarMessage: String? = null,
+    val snackbarMessage: UiText? = null,
     val crashReports: List<CrashReport> = emptyList()
 ) : UiState
 
@@ -51,7 +52,7 @@ sealed interface SettingsUiEffect : UiEffect {
     data class OpenUrl(val url: String) : SettingsUiEffect
     data object LaunchFolderPicker : SettingsUiEffect
     data object RequestPasteToken : SettingsUiEffect
-    data class CopyToClipboard(val label: String, val text: String) : SettingsUiEffect
-    data class ShareText(val title: String, val text: String) : SettingsUiEffect
-    data class ShowSnackbar(val message: String) : SettingsUiEffect
+    data class CopyToClipboard(val label: UiText, val text: String) : SettingsUiEffect
+    data class ShareText(val title: UiText, val text: String) : SettingsUiEffect
+    data class ShowSnackbar(val message: UiText) : SettingsUiEffect
 }

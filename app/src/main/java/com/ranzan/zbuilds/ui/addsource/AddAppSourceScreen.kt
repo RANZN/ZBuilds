@@ -55,16 +55,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
 import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.core.utils.BuildVariant
 import com.ranzan.zbuilds.core.utils.BuildVariantHelper
@@ -163,14 +164,14 @@ fun AddAppSourceScreen(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Add App Source",
+                    text = stringResource(R.string.add_source_title),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
             }
             Text(
-                text = "Enter any GitHub repo or release URL to discover available downloads",
+                text = stringResource(R.string.add_source_subtitle),
                 fontSize = 12.sp,
                 color = TextSecondary,
                 modifier = Modifier.padding(top = 4.dp)
@@ -184,7 +185,7 @@ fun AddAppSourceScreen(
                 onValueChange = onUrlChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
-                    Text("https://github.com/owner/repo/releases", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.add_source_input_placeholder), color = TextMuted, fontSize = 13.sp)
                 },
                 leadingIcon = {
                     Icon(Icons.Default.Link, contentDescription = null, tint = GreenPrimary)
@@ -193,7 +194,7 @@ fun AddAppSourceScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (sourceUrl.isNotEmpty()) {
                             IconButton(onClick = { onUrlChange("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextMuted)
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.add_source_clear_desc), tint = TextMuted)
                             }
                         }
                         IconButton(onClick = {
@@ -204,7 +205,7 @@ fun AddAppSourceScreen(
                                 onUrlChange(text)
                             }
                         }) {
-                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste", tint = GreenPrimary)
+                            Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.add_source_paste_desc), tint = GreenPrimary)
                         }
                     }
                 },
@@ -272,11 +273,11 @@ fun AddAppSourceScreen(
                         color = DarkBackground
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Fetching Available Downloads...", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.add_source_btn_fetching), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 } else {
                     Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Fetch Downloads", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.add_source_btn_fetch), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -313,13 +314,13 @@ fun AddAppSourceScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Release: ${fetchedRelease.tag} (${filteredAssets.size} downloads found)",
+                    text = pluralStringResource(R.plurals.add_source_release_found_title, filteredAssets.size, fetchedRelease.tag, filteredAssets.size),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = AccentGreen
                 )
                 Text(
-                    text = "Select what you want to download and add to home screen:",
+                    text = stringResource(R.string.add_source_select_instruction),
                     fontSize = 12.sp,
                     color = TextSecondary,
                     modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
@@ -427,7 +428,7 @@ private fun ReleaseAssetCard(
                             .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            asset.fileType.displayName,
+                            stringResource(if (asset.fileType == AppFileType.APK) R.string.file_type_apk else R.string.file_type_zip),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (asset.fileType == AppFileType.APK) AccentBlue else AccentOrange
@@ -454,7 +455,7 @@ private fun ReleaseAssetCard(
                     }
 
                     Text(
-                        text = "${asset.arch} • ${FormatHelper.formatBytes(asset.sizeBytes)}",
+                        text = stringResource(R.string.add_source_asset_meta, asset.arch, FormatHelper.formatBytes(asset.sizeBytes)),
                         fontSize = 11.sp,
                         color = TextSecondary
                     )
@@ -474,7 +475,7 @@ private fun ReleaseAssetCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.Download,
-                    contentDescription = "Download",
+                    contentDescription = stringResource(R.string.add_source_download_desc),
                     tint = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
                     modifier = Modifier.size(18.dp)
                 )

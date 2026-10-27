@@ -157,7 +157,7 @@ fun TrackedAppCard(
                     if (installedAppBitmap != null) {
                         Image(
                             bitmap = installedAppBitmap,
-                            contentDescription = "${app.name} icon",
+                            contentDescription = stringResource(R.string.card_icon_desc, app.name),
                             modifier = Modifier.size(34.dp),
                             contentScale = ContentScale.Fit
                         )
@@ -184,7 +184,7 @@ fun TrackedAppCard(
                     Spacer(modifier = Modifier.height(2.dp))
 
                     Text(
-                        text = "Version: ${app.latestBuildVersion} • ${FormatHelper.formatBytes(app.latestSizeBytes)}",
+                        text = stringResource(R.string.card_version_label, app.latestBuildVersion, FormatHelper.formatBytes(app.latestSizeBytes)),
                         fontSize = 12.sp,
                         color = TextSecondary
                     )
@@ -194,7 +194,7 @@ fun TrackedAppCard(
                     IconButton(onClick = { showMenu = true }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Options",
+                            contentDescription = stringResource(R.string.card_options_desc),
                             tint = TextSecondary
                         )
                     }
@@ -274,13 +274,13 @@ fun TrackedAppCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Downloading...",
+                            text = stringResource(R.string.card_downloading),
                             fontSize = 12.sp,
                             color = GreenPrimary,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "$percentInt%",
+                            text = stringResource(R.string.card_progress_percent, percentInt),
                             fontSize = 12.sp,
                             color = GreenPrimary,
                             fontWeight = FontWeight.Bold
@@ -301,7 +301,7 @@ fun TrackedAppCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "${FormatHelper.formatBytes(progress.downloadedBytes)} / ${FormatHelper.formatBytes(progress.totalBytes)}",
+                            text = stringResource(R.string.card_progress_bytes, FormatHelper.formatBytes(progress.downloadedBytes), FormatHelper.formatBytes(progress.totalBytes)),
                             fontSize = 11.sp,
                             color = TextMuted
                         )
@@ -323,7 +323,7 @@ fun TrackedAppCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         val currentVer = app.installedVersion ?: app.downloadedBuildVersion
                         Text(
-                            text = "Update Available: current $currentVer → latest ${app.latestBuildVersion}",
+                            text = stringResource(R.string.card_update_available, currentVer, app.latestBuildVersion),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = AccentOrange
@@ -346,7 +346,7 @@ fun TrackedAppCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Up to date (${app.installedVersion ?: app.downloadedBuildVersion.ifBlank { app.latestBuildVersion }})",
+                            text = stringResource(R.string.card_up_to_date, app.installedVersion ?: app.downloadedBuildVersion.ifBlank { app.latestBuildVersion }),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = TextSecondary
@@ -375,7 +375,7 @@ fun TrackedAppCard(
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Cancel Download", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.card_btn_cancel_download), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 } else if (app.hasUpdate) {
                     Button(
@@ -389,7 +389,7 @@ fun TrackedAppCard(
                     ) {
                         Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Update Now", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.card_btn_update_now), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 } else if (app.fileType == AppFileType.APK) {
                     if (fileExists) {
@@ -426,7 +426,7 @@ fun TrackedAppCard(
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.dp, DarkCardBorder)
                             ) {
-                                Icon(Icons.Default.OpenInNew, contentDescription = "Open App", tint = TextPrimary)
+                                Icon(Icons.Default.OpenInNew, contentDescription = stringResource(R.string.card_btn_open_app), tint = TextPrimary)
                             }
                         }
                     } else {
@@ -441,7 +441,7 @@ fun TrackedAppCard(
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Download APK", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.card_btn_download_apk), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 } else {
@@ -458,7 +458,7 @@ fun TrackedAppCard(
                         ) {
                             Icon(Icons.Default.FolderZip, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Flash / Open ZIP", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.card_btn_flash_zip), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
                         Button(
@@ -472,7 +472,7 @@ fun TrackedAppCard(
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Download ZIP", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.card_btn_download_zip), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -484,7 +484,7 @@ fun TrackedAppCard(
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, DarkCardBorder)
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Re-download", tint = TextSecondary)
+                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.card_btn_redownload), tint = TextSecondary)
                     }
                 }
             }

@@ -41,8 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,6 +53,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ranzan.zbuilds.R
+import com.ranzan.zbuilds.core.base.asString
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
@@ -92,7 +93,7 @@ fun HomeScreenHost(
         viewModel.uiEffect.collect { effect ->
             when (effect) {
                 is HomeUiEffect.NavigateToSettings -> onSettingsClick()
-                is HomeUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
+                is HomeUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message.asString(context))
                 is HomeUiEffect.InstallApk -> FileIntentHelper.installApk(context, effect.filePath)
                 is HomeUiEffect.OpenApp -> FileIntentHelper.openApp(context, effect.packageName)
                 is HomeUiEffect.UninstallApp -> FileIntentHelper.uninstallApp(context, effect.packageName)
@@ -109,11 +110,11 @@ fun HomeScreenHost(
             sourceUrl = state.addSourceUrl,
             isFetching = state.isFetchingSource,
             fetchedRelease = state.fetchedRelease,
-            errorMessage = state.addSourceError,
+            errorMessage = state.addSourceError?.asString(),
             olderReleases = state.olderReleases.releases,
             isLoadingOlder = state.olderReleases.isLoading,
             hasMoreOlder = state.olderReleases.hasMore,
-            olderMessage = state.olderReleases.message,
+            olderMessage = state.olderReleases.message?.asString(),
             suggestions = state.suggestions,
             showApks = state.showApks,
             showModules = state.showModules,

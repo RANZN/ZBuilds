@@ -3,6 +3,7 @@ package com.ranzan.zbuilds.ui.home
 import com.ranzan.zbuilds.core.base.UiAction
 import com.ranzan.zbuilds.core.base.UiEffect
 import com.ranzan.zbuilds.core.base.UiState
+import com.ranzan.zbuilds.core.base.UiText
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
@@ -26,8 +27,8 @@ data class HomeUiState(
     val fetchedRelease: SourceRelease? = null,
     val fetchedSourceUrl: String = "",
     val olderReleases: OlderReleasesState = OlderReleasesState(),
-    val addSourceError: String? = null,
-    val statusMessage: String? = null
+    val addSourceError: UiText? = null,
+    val statusMessage: UiText? = null
 ) : UiState {
     val updateCount: Int
         get() = trackedApps.count { it.hasUpdate }
@@ -42,7 +43,7 @@ data class OlderReleasesState(
     val lastLoadedPage: Int = 0,
     val hasMore: Boolean = true,
     val isLoading: Boolean = false,
-    val message: String? = null
+    val message: UiText? = null
 )
 
 sealed interface HomeUiAction : UiAction {
@@ -75,7 +76,7 @@ typealias HomeUiEvent = HomeUiAction
 
 sealed interface HomeUiEffect : UiEffect {
     data object NavigateToSettings : HomeUiEffect
-    data class ShowSnackbar(val message: String) : HomeUiEffect
+    data class ShowSnackbar(val message: UiText) : HomeUiEffect
     data class InstallApk(val filePath: String) : HomeUiEffect
     data class OpenApp(val packageName: String) : HomeUiEffect
     data class UninstallApp(val packageName: String) : HomeUiEffect

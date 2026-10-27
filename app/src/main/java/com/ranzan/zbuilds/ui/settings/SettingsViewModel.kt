@@ -1,7 +1,9 @@
 package com.ranzan.zbuilds.ui.settings
 
 import androidx.lifecycle.viewModelScope
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.core.base.BaseViewModel
+import com.ranzan.zbuilds.core.base.UiText
 import com.ranzan.zbuilds.core.utils.CrashReportHelper
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppSettings
@@ -11,6 +13,7 @@ import com.ranzan.zbuilds.domain.usecase.GetCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.UpdateSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.ValidateGithubTokenUseCase
+import com.ranzan.zbuilds.ui.util.toUiText
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -24,6 +27,9 @@ class SettingsViewModel(
 ) : BaseViewModel<SettingsUiState, SettingsUiAction, SettingsUiEffect>(SettingsUiState()) {
 
     companion object {
+        // Shown when GitHub does not report rate limits (the authenticated default)
+        private const val DEFAULT_RATE_LIMIT = 5000
+
         const val GITHUB_GENERATE_TOKEN_URL = "https://github.com/settings/tokens/new?description=ZBuilds%20Android%20App&scopes=public_repo"
     }
 
@@ -63,7 +69,7 @@ class SettingsViewModel(
                 val token = currentState.tokenInput.trim().ifBlank { null }
                 viewModelScope.launch {
                     updateSettingsUseCase.updateGithubToken(token)
-                    val msg = if (token != null) "GitHub token saved" else "GitHub token cleared"
+                    val msg = UiText.res(if (token != null) R.string.settings_msg_token_saved else R.string.settings_msg_token_cleared)
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
@@ -72,7 +78,7 @@ class SettingsViewModel(
             is SettingsUiAction.OnClearToken -> {
                 viewModelScope.launch {
                     updateSettingsUseCase.updateGithubToken(null)
-                    val msg = "GitHub token removed"
+                    val msg = UiText.res(R.string.settings_msg_token_removed)
                     setState {
                         copy(
                             tokenInput = "",
@@ -89,7 +95,7 @@ class SettingsViewModel(
                 if (token.isBlank()) {
                     setState {
                         copy(
-                            tokenValidationMessage = "Please enter a token first to test.",
+                            tokenValidationMessage = UiText.res(R.string.settings_msg_token_empty),
                             isTokenValid = false
                         )
                     }
@@ -100,7 +106,13 @@ class SettingsViewModel(
                     setState { copy(isValidatingToken = true, tokenValidationMessage = null) }
                     val result = validateGithubTokenUseCase(token)
                     result.fold(
-                        onSuccess = { message ->
+                        onSuccess = { status ->
+                            val message = UiText.res(
+                                R.string.settings_msg_token_valid,
+                                status.login ?: UiText.res(R.string.settings_token_unknown_user),
+                                status.remainingRequests ?: DEFAULT_RATE_LIMIT,
+                                status.requestLimit ?: DEFAULT_RATE_LIMIT
+                            )
                             setState {
                                 copy(
                                     isValidatingToken = false,
@@ -113,7 +125,7 @@ class SettingsViewModel(
                             setState {
                                 copy(
                                     isValidatingToken = false,
-                                    tokenValidationMessage = error.message ?: "Validation failed",
+                                    tokenValidationMessage = error.toUiText(),
                                     isTokenValid = false
                                 )
                             }
@@ -128,7 +140,7 @@ class SettingsViewModel(
 
             is SettingsUiAction.OnToggleBuildFormats -> {
                 if (!action.showApks && !action.showModules) {
-                    val msg = "At least one format (APKs or Modules) must remain selected."
+                    val msg = UiText.res(R.string.settings_msg_formats_required)
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                     return
@@ -136,7 +148,7 @@ class SettingsViewModel(
 
                 viewModelScope.launch {
                     updateSettingsUseCase.updateBuildFormats(action.showApks, action.showModules)
-                    val msg = "Build formats updated"
+                    val msg = UiText.res(R.string.settings_msg_formats_updated)
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
@@ -145,7 +157,11 @@ class SettingsViewModel(
             is SettingsUiAction.OnFolderUpdated -> {
                 viewModelScope.launch {
                     updateSettingsUseCase.updateStorageFolder(action.uri, action.path)
-                    val msg = if (action.uri != null) "Download folder updated: ${action.path}" else "Reset to default app storage"
+                    val msg = if (action.uri != null) {
+                        UiText.res(R.string.settings_msg_folder_updated, action.path.orEmpty())
+                    } else {
+                        UiText.res(R.string.settings_msg_folder_reset)
+                    }
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
@@ -154,7 +170,7 @@ class SettingsViewModel(
             is SettingsUiAction.OnToggleAutoClean -> {
                 viewModelScope.launch {
                     updateSettingsUseCase.updateAutoClean(action.enabled)
-                    val msg = if (action.enabled) "Auto-clean old versions enabled" else "Auto-clean disabled"
+                    val msg = UiText.res(if (action.enabled) R.string.settings_msg_auto_clean_on else R.string.settings_msg_auto_clean_off)
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
@@ -163,7 +179,7 @@ class SettingsViewModel(
             is SettingsUiAction.OnSelectRetentionDays -> {
                 viewModelScope.launch {
                     updateSettingsUseCase.updateCleanupRetentionDays(action.days)
-                    val msg = "Cleanup retention set to ${action.days} days"
+                    val msg = UiText.plural(R.plurals.settings_msg_retention_set, action.days, action.days)
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
@@ -176,7 +192,7 @@ class SettingsViewModel(
                     result.fold(
                         onSuccess = { freedBytes ->
                             val readable = FormatHelper.formatBytes(freedBytes)
-                            val msg = "Cleaned storage: $readable freed"
+                            val msg = UiText.res(R.string.settings_msg_storage_cleaned, readable)
                             setState {
                                 copy(
                                     isClearingCache = false,
@@ -186,7 +202,7 @@ class SettingsViewModel(
                             sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                         },
                         onFailure = { error ->
-                            val msg = "Failed to clean storage: ${error.message}"
+                            val msg = UiText.res(R.string.settings_msg_storage_clean_failed, error.toUiText())
                             setState {
                                 copy(
                                     isClearingCache = false,
@@ -202,7 +218,7 @@ class SettingsViewModel(
             is SettingsUiAction.OnClearCrashReports -> {
                 viewModelScope.launch {
                     clearCrashReportsUseCase()
-                    val msg = "Local crash reports cleared"
+                    val msg = UiText.res(R.string.settings_msg_crashes_cleared)
                     setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
@@ -215,13 +231,13 @@ class SettingsViewModel(
 
             is SettingsUiAction.OnCopyCrashReport -> {
                 val markdown = CrashReportHelper.formatReportAsMarkdown(action.report)
-                sendEffect(SettingsUiEffect.CopyToClipboard("Crash Report", markdown))
-                sendEffect(SettingsUiEffect.ShowSnackbar("Crash report copied to clipboard"))
+                sendEffect(SettingsUiEffect.CopyToClipboard(UiText.res(R.string.settings_crash_clipboard_label), markdown))
+                sendEffect(SettingsUiEffect.ShowSnackbar(UiText.res(R.string.settings_msg_crash_copied)))
             }
 
             is SettingsUiAction.OnShareCrashReport -> {
                 val markdown = CrashReportHelper.formatReportAsMarkdown(action.report)
-                sendEffect(SettingsUiEffect.ShareText("ZBuilds Crash Report", markdown))
+                sendEffect(SettingsUiEffect.ShareText(UiText.res(R.string.settings_crash_share_title), markdown))
             }
 
             is SettingsUiAction.OnClearSnackbar -> {

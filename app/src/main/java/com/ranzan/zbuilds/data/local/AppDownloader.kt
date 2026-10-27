@@ -1,13 +1,18 @@
 package com.ranzan.zbuilds.data.local
 
 import android.content.Context
-import android.os.Environment
 import android.net.Uri
+import android.os.Environment
 import androidx.documentfile.provider.DocumentFile
+import com.ranzan.zbuilds.domain.model.AppError
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
 import com.ranzan.zbuilds.domain.repository.PackageInspectorRepository
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,11 +24,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 
 class AppDownloader(
     private val context: Context,
@@ -91,12 +91,12 @@ class AppDownloader(
 
             val response = client.newCall(requestBuilder.build()).execute()
             if (!response.isSuccessful) {
-                val errorMsg = "HTTP error ${response.code}: ${response.message}"
-                flow.value = DownloadProgress.Failed(app.id, errorMsg)
-                return@withContext Result.failure(IOException(errorMsg))
+                val error = AppError.Http(response.code)
+                flow.value = DownloadProgress.Failed(app.id, error)
+                return@withContext Result.failure(error)
             }
 
-            val body = response.body ?: throw IOException("Empty response body")
+            val body = response.body ?: throw AppError.EmptyDownload()
             val totalBytes = if (body.contentLength() > 0) body.contentLength() else app.latestSizeBytes
 
             try {
@@ -110,7 +110,7 @@ class AppDownloader(
                         while (input.read(buffer).also { bytesRead = it } != -1) {
                             if (!currentCoroutineContext().isActive) {
                                 partialFile.delete()
-                                throw CancellationException("Download canceled")
+                                throw CancellationException()
                             }
 
                             output.write(buffer, 0, bytesRead)
@@ -145,7 +145,7 @@ class AppDownloader(
             }
             if (!partialFile.renameTo(destinationFile)) {
                 partialFile.delete()
-                throw IOException("Failed to save downloaded file")
+                throw AppError.SaveFailed()
             }
 
             // Post-download inspection
@@ -218,7 +218,7 @@ class AppDownloader(
             flow.value = DownloadProgress.Idle(app.id)
             Result.failure(e)
         } catch (e: Exception) {
-            flow.value = DownloadProgress.Failed(app.id, e.message ?: "Download failed")
+            flow.value = DownloadProgress.Failed(app.id, e)
             Result.failure(e)
         } finally {
             activeJobs.remove(app.id)

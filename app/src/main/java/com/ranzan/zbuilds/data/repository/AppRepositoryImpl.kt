@@ -140,7 +140,7 @@ class AppRepositoryImpl(
         return try {
             val releaseResult = gitHubApiService.fetchReleases(app.sourceUrl)
             if (releaseResult.isFailure) {
-                return Result.failure(releaseResult.exceptionOrNull() ?: Exception("Unknown error"))
+                return Result.failure(releaseResult.exceptionOrNull() ?: IllegalStateException())
             }
 
             val updatedApp = applyRelease(app, releaseResult.getOrThrow())

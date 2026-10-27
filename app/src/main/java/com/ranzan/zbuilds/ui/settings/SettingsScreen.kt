@@ -80,6 +80,7 @@ import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ranzan.zbuilds.R
+import com.ranzan.zbuilds.core.base.asString
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppSettings
 import com.ranzan.zbuilds.domain.model.CrashReport
@@ -112,6 +113,7 @@ fun SettingsScreenHost(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val customFolderLabel = stringResource(R.string.settings_folder_custom)
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -124,7 +126,7 @@ fun SettingsScreenHost(
                 viewModel.onAction(
                     SettingsUiAction.OnFolderUpdated(
                         uri = treeUri.toString(),
-                        path = doc?.name ?: treeUri.lastPathSegment ?: "Custom Folder"
+                        path = doc?.name ?: treeUri.lastPathSegment ?: customFolderLabel
                     )
                 )
             } catch (e: Exception) {
@@ -162,7 +164,7 @@ fun SettingsScreenHost(
                 is SettingsUiEffect.CopyToClipboard -> {
                     try {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                        clipboard?.setPrimaryClip(ClipData.newPlainText(effect.label, effect.text))
+                        clipboard?.setPrimaryClip(ClipData.newPlainText(effect.label.asString(context), effect.text))
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -171,16 +173,16 @@ fun SettingsScreenHost(
                     try {
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, effect.title)
+                            putExtra(Intent.EXTRA_SUBJECT, effect.title.asString(context))
                             putExtra(Intent.EXTRA_TEXT, effect.text)
                         }
-                        context.startActivity(Intent.createChooser(intent, effect.title))
+                        context.startActivity(Intent.createChooser(intent, effect.title.asString(context)))
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
                 }
                 is SettingsUiEffect.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                    snackbarHostState.showSnackbar(effect.message.asString(context))
                 }
             }
         }
@@ -345,7 +347,7 @@ fun SettingsScreen(
                             )
                         )
                         Text(
-                            text = "••••••••••••${state.settings.githubToken.takeLast(4)}",
+                            text = stringResource(R.string.settings_token_masked, state.settings.githubToken.takeLast(4)),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
                                 fontFamily = FontFamily.Monospace
@@ -426,7 +428,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = state.tokenValidationMessage.orEmpty(),
+                                text = state.tokenValidationMessage?.asString().orEmpty(),
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = if (state.isTokenValid) AccentGreenText else AccentRed,
                                     fontWeight = FontWeight.Medium
@@ -500,7 +502,7 @@ fun SettingsScreen(
                                     )
                                 )
                                 if (showApks) {
-                                    Text("✓", color = AccentGreen, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.settings_check_mark), color = AccentGreen, fontWeight = FontWeight.Bold)
                                 }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
@@ -548,7 +550,7 @@ fun SettingsScreen(
                                     )
                                 )
                                 if (showModules) {
-                                    Text("✓", color = AccentGreen, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.settings_check_mark), color = AccentGreen, fontWeight = FontWeight.Bold)
                                 }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
@@ -622,7 +624,8 @@ fun SettingsScreen(
                             onAction(
                                 SettingsUiAction.OnFolderUpdated(
                                     uri = null,
-                                    path = "Default: App Storage (Downloads/ZBuilds)"
+                                    // No saved path means the default folder, whose label comes from strings.xml
+                                    path = null
                                 )
                             )
                         },
@@ -797,7 +800,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Recorded Reports",
+                        text = stringResource(R.string.settings_crash_recorded_reports),
                         style = MaterialTheme.typography.labelMedium.copy(color = TextMuted)
                     )
                     Text(
@@ -838,7 +841,11 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${latest.deviceInfo} • ${FormatHelper.formatDate(latest.timestamp)}",
+                            text = stringResource(
+                                R.string.settings_crash_meta,
+                                latest.deviceInfo,
+                                FormatHelper.formatDate(latest.timestamp) ?: stringResource(R.string.common_unknown)
+                            ),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextMuted,
                                 fontSize = 10.sp
@@ -938,9 +945,13 @@ fun SettingsScreen(
             }
 
             // Section 5: About ZBuilds
+            val context = LocalContext.current
+            val appVersionName = remember(context) {
+                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
+            }
             SettingsSectionCard(title = stringResource(R.string.settings_section_about)) {
                 Text(
-                    text = AppSettings.APP_DESCRIPTION,
+                    text = stringResource(R.string.settings_about_description),
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
 
@@ -962,7 +973,8 @@ fun SettingsScreen(
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = AppSettings.APP_VERSION,
+                            text = appVersionName?.let { stringResource(R.string.settings_about_version, it) }
+                                ?: stringResource(R.string.common_unknown),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = AccentGreenText,
                                 fontWeight = FontWeight.Bold
@@ -974,7 +986,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = AppSettings.TECH_STACK,
+                    text = stringResource(R.string.settings_about_tech_stack),
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = TextMuted,
                         lineHeight = 16.sp

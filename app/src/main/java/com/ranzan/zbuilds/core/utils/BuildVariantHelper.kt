@@ -1,8 +1,8 @@
 package com.ranzan.zbuilds.core.utils
 
-enum class BuildVariant(val displayName: String) {
-    DEBUG("Debug"),
-    RELEASE("Release")
+enum class BuildVariant {
+    DEBUG,
+    RELEASE
 }
 
 object BuildVariantHelper {

@@ -14,8 +14,11 @@ object FormatHelper {
         return String.format(Locale.US, "%.1f %s", bytes / Math.pow(1024.0, index.toDouble()), units[index])
     }
 
-    fun formatDate(timestampMs: Long): String {
-        if (timestampMs <= 0) return "Unknown"
+    /**
+     * Formats a timestamp as a date, or returns null when it is not set.
+     */
+    fun formatDate(timestampMs: Long): String? {
+        if (timestampMs <= 0) return null
         val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
         return sdf.format(Date(timestampMs))
     }

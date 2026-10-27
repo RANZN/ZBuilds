@@ -20,6 +20,6 @@ sealed interface DownloadProgress {
 
     data class Failed(
         override val appId: String,
-        val error: String
+        val error: Throwable
     ) : DownloadProgress
 }

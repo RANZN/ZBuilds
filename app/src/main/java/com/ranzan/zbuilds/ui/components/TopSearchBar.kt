@@ -16,8 +16,10 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.ui.theme.DarkCardBorder
 import com.ranzan.zbuilds.ui.theme.DarkSurface
 import com.ranzan.zbuilds.ui.theme.TextMuted
@@ -38,7 +40,7 @@ fun TopSearchBar(
             .background(DarkSurface, RoundedCornerShape(16.dp)),
         placeholder = {
             Text(
-                text = "Search apps, versions, or files...",
+                text = stringResource(R.string.home_search_placeholder),
                 color = TextMuted,
                 fontSize = 14.sp
             )
@@ -46,7 +48,7 @@ fun TopSearchBar(
         leadingIcon = {
             Icon(
                 imageVector = Icons.Default.Search,
-                contentDescription = "Search",
+                contentDescription = stringResource(R.string.home_search_desc),
                 tint = TextMuted
             )
         },
@@ -55,7 +57,7 @@ fun TopSearchBar(
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Default.Clear,
-                        contentDescription = "Clear search",
+                        contentDescription = stringResource(R.string.home_search_clear_desc),
                         tint = TextMuted
                     )
                 }

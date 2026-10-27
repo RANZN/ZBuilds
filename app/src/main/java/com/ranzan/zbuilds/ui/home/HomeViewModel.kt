@@ -1,7 +1,9 @@
 package com.ranzan.zbuilds.ui.home
 
 import androidx.lifecycle.viewModelScope
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.core.base.BaseViewModel
+import com.ranzan.zbuilds.core.base.UiText
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.core.utils.latestBuildVersion
 import com.ranzan.zbuilds.domain.model.AppFileType
@@ -17,6 +19,7 @@ import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
+import com.ranzan.zbuilds.ui.util.toUiText
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -144,7 +147,7 @@ class HomeViewModel(
             is HomeUiAction.OnDeleteTrackedApp -> {
                 viewModelScope.launch {
                     deleteTrackedAppUseCase(action.appId)
-                    val msg = "App removed from tracked list"
+                    val msg = UiText.res(R.string.home_msg_app_removed)
                     setState { copy(statusMessage = msg) }
                     sendEffect(HomeUiEffect.ShowSnackbar(msg))
                 }
@@ -175,7 +178,7 @@ class HomeViewModel(
     private fun checkForUpdates(silent: Boolean) {
         viewModelScope.launch {
             if (!silent) {
-                setState { copy(isRefreshing = true, statusMessage = "Checking for updates...") }
+                setState { copy(isRefreshing = true, statusMessage = UiText.res(R.string.home_msg_checking)) }
             }
 
             val result = checkAppUpdatesUseCase()
@@ -183,9 +186,9 @@ class HomeViewModel(
                 val updatedApps = result.getOrNull().orEmpty()
                 val newUpdatesCount = updatedApps.count { it.hasUpdate }
                 val message = if (newUpdatesCount > 0) {
-                    "$newUpdatesCount update(s) available!"
+                    UiText.plural(R.plurals.home_msg_updates_available, newUpdatesCount, newUpdatesCount)
                 } else if (!silent) {
-                    "All tracked apps are up to date"
+                    UiText.res(R.string.home_msg_all_up_to_date)
                 } else {
                     null
                 }
@@ -200,7 +203,7 @@ class HomeViewModel(
                     sendEffect(HomeUiEffect.ShowSnackbar(message))
                 }
             } else {
-                val errorMsg = if (!silent) "Failed to check updates: ${result.exceptionOrNull()?.message}" else null
+                val errorMsg = if (!silent) UiText.res(R.string.home_msg_check_failed, result.exceptionOrNull().toUiText()) else null
                 setState {
                     copy(
                         isRefreshing = false,
@@ -219,18 +222,18 @@ class HomeViewModel(
      */
     private fun checkSingleAppUpdate(app: TrackedApp) {
         viewModelScope.launch {
-            setState { copy(isRefreshing = true, statusMessage = "Checking ${app.name} for updates...") }
+            setState { copy(isRefreshing = true, statusMessage = UiText.res(R.string.home_msg_checking_app, app.name)) }
 
             val result = checkAppUpdatesUseCase.checkSingleApp(app)
             val message = if (result.isSuccess) {
                 val updatedApp = result.getOrThrow()
                 if (updatedApp.hasUpdate) {
-                    "Update available for ${updatedApp.name} (${updatedApp.latestBuildVersion})"
+                    UiText.res(R.string.home_msg_app_update_available, updatedApp.name, updatedApp.latestBuildVersion)
                 } else {
-                    "${updatedApp.name} is up to date"
+                    UiText.res(R.string.home_msg_app_up_to_date, updatedApp.name)
                 }
             } else {
-                "Failed to check updates: ${result.exceptionOrNull()?.message}"
+                UiText.res(R.string.home_msg_check_failed, result.exceptionOrNull().toUiText())
             }
 
             setState { copy(isRefreshing = false, statusMessage = message) }
@@ -241,7 +244,7 @@ class HomeViewModel(
     private fun downloadAllAvailableUpdates() {
         val appsToUpdate = currentState.trackedApps.filter { it.hasUpdate }
         if (appsToUpdate.isNotEmpty()) {
-            val msg = "Starting download for ${appsToUpdate.size} update(s)..."
+            val msg = UiText.plural(R.plurals.home_msg_starting_downloads, appsToUpdate.size, appsToUpdate.size)
             setState { copy(statusMessage = msg) }
             sendEffect(HomeUiEffect.ShowSnackbar(msg))
             appsToUpdate.forEach { app ->
@@ -251,13 +254,13 @@ class HomeViewModel(
             }
         } else {
             viewModelScope.launch {
-                setState { copy(isRefreshing = true, statusMessage = "Checking for available updates...") }
+                setState { copy(isRefreshing = true, statusMessage = UiText.res(R.string.home_msg_checking_updates)) }
                 val result = checkAppUpdatesUseCase()
                 if (result.isSuccess) {
                     val updatedApps = result.getOrNull().orEmpty()
                     val newUpdates = updatedApps.filter { it.hasUpdate }
                     if (newUpdates.isNotEmpty()) {
-                        val msg = "Found ${newUpdates.size} update(s). Starting downloads..."
+                        val msg = UiText.plural(R.plurals.home_msg_found_updates, newUpdates.size, newUpdates.size)
                         setState {
                             copy(
                                 isRefreshing = false,
@@ -271,7 +274,7 @@ class HomeViewModel(
                             }
                         }
                     } else {
-                        val msg = "All tracked apps are up to date"
+                        val msg = UiText.res(R.string.home_msg_all_up_to_date)
                         setState {
                             copy(
                                 isRefreshing = false,
@@ -281,7 +284,7 @@ class HomeViewModel(
                         sendEffect(HomeUiEffect.ShowSnackbar(msg))
                     }
                 } else {
-                    val errorMsg = "Failed to check updates: ${result.exceptionOrNull()?.message}"
+                    val errorMsg = UiText.res(R.string.home_msg_check_failed, result.exceptionOrNull().toUiText())
                     setState {
                         copy(
                             isRefreshing = false,
@@ -311,10 +314,10 @@ class HomeViewModel(
             val page = result.getOrNull()
 
             val message = when {
-                page == null -> result.exceptionOrNull()?.message ?: "Failed to load older releases"
+                page == null -> result.exceptionOrNull().toUiText()
                 page.releases.isNotEmpty() -> null
-                page.hasMore -> "No new files in the last ${page.pagesChecked} pages of older releases. Tap again to keep looking."
-                else -> "No other files found in older releases"
+                page.hasMore -> UiText.plural(R.plurals.add_source_no_new_files, page.pagesChecked, page.pagesChecked)
+                else -> UiText.res(R.string.add_source_no_other_files)
             }
 
             setState {
@@ -334,7 +337,7 @@ class HomeViewModel(
     private fun fetchSourceReleases() {
         val url = currentState.addSourceUrl.trim()
         if (url.isBlank()) {
-            setState { copy(addSourceError = "Please enter a GitHub repository URL") }
+            setState { copy(addSourceError = UiText.res(R.string.add_source_error_empty_url)) }
             return
         }
 
@@ -350,14 +353,14 @@ class HomeViewModel(
                         isFetchingSource = false,
                         fetchedRelease = release,
                         fetchedSourceUrl = url,
-                        addSourceError = if (release?.assets.isNullOrEmpty()) "No APK or ZIP assets found in this release" else null
+                        addSourceError = if (release?.assets.isNullOrEmpty()) UiText.res(R.string.add_source_error_no_assets) else null
                     )
                 }
             } else {
                 setState {
                     copy(
                         isFetchingSource = false,
-                        addSourceError = result.exceptionOrNull()?.message ?: "Failed to fetch repository release"
+                        addSourceError = result.exceptionOrNull().toUiText()
                     )
                 }
             }
@@ -395,7 +398,7 @@ class HomeViewModel(
         viewModelScope.launch {
             addTrackedAppUseCase(newApp)
 
-            val msg = "Added $appName to tracked apps"
+            val msg = UiText.res(R.string.home_msg_app_added, appName)
             // Close Add App Source and give feedback
             setState {
                 copy(
@@ -431,9 +434,9 @@ class HomeViewModel(
             progressJob.cancel()
 
             val msg = if (result.isSuccess) {
-                "Downloaded ${app.name} (${app.latestBuildVersion})"
+                UiText.res(R.string.home_msg_downloaded, app.name, app.latestBuildVersion)
             } else {
-                "Download failed: ${result.exceptionOrNull()?.message}"
+                UiText.res(R.string.home_msg_download_failed, result.exceptionOrNull().toUiText())
             }
 
             setState {

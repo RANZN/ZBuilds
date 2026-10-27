@@ -25,9 +25,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.ui.theme.AccentGreen
 import com.ranzan.zbuilds.ui.theme.AccentOrange
 import com.ranzan.zbuilds.ui.theme.DarkBackground
@@ -66,17 +69,17 @@ fun UpdateBannerCard(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = "Install/Update apps",
+                    text = stringResource(R.string.home_banner_title),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 val subtitle = when {
-                    isDownloading -> "⬇️ Downloading available updates..."
-                    updateCount > 0 -> "⚡ $updateCount update(s) available to download"
-                    totalAppsCount == 0 -> "Add app sources to start tracking updates"
-                    else -> "✓ All $totalAppsCount apps are up to date"
+                    isDownloading -> stringResource(R.string.home_banner_downloading_updates)
+                    updateCount > 0 -> pluralStringResource(R.plurals.home_banner_updates_available, updateCount, updateCount)
+                    totalAppsCount == 0 -> stringResource(R.string.home_banner_no_apps)
+                    else -> pluralStringResource(R.plurals.home_banner_all_updated, totalAppsCount, totalAppsCount)
                 }
                 val subtitleColor = when {
                     isDownloading -> AccentOrange
@@ -113,7 +116,7 @@ fun UpdateBannerCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Checking...",
+                        text = stringResource(R.string.home_btn_checking),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -125,7 +128,7 @@ fun UpdateBannerCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Downloading...",
+                        text = stringResource(R.string.home_btn_downloading),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -137,7 +140,7 @@ fun UpdateBannerCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (updateCount > 0) "Update All" else "Update",
+                        text = stringResource(if (updateCount > 0) R.string.home_btn_update_all else R.string.home_btn_update),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
