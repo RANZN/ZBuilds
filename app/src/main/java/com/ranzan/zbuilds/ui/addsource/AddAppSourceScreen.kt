@@ -1,7 +1,5 @@
 package com.ranzan.zbuilds.ui.addsource
 
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -57,7 +55,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -67,8 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ranzan.zbuilds.R
-import com.ranzan.zbuilds.core.utils.BuildVariant
-import com.ranzan.zbuilds.core.utils.BuildVariantHelper
+import com.ranzan.zbuilds.domain.model.BuildVariant
 import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
@@ -94,22 +90,21 @@ fun AddAppSourceScreen(
     sourceUrl: String,
     isFetching: Boolean,
     fetchedRelease: SourceRelease?,
+    releaseAssets: List<ReleaseAsset>,
     errorMessage: String?,
     olderReleases: List<SourceRelease> = emptyList(),
     isLoadingOlder: Boolean = false,
     hasMoreOlder: Boolean = false,
     olderMessage: String? = null,
     suggestions: List<SourceSuggestion> = emptyList(),
-    showApks: Boolean = true,
-    showModules: Boolean = true,
     onUrlChange: (String) -> Unit,
+    onPasteClick: () -> Unit,
     onFetchClick: () -> Unit,
     onLoadOlderClick: () -> Unit = {},
     onSelectAsset: (ReleaseAsset, SourceRelease) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
     // Any interaction other than typing in the URL field hides the keyboard
@@ -197,14 +192,7 @@ fun AddAppSourceScreen(
                                 Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.add_source_clear_desc), tint = TextMuted)
                             }
                         }
-                        IconButton(onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            val clipData = clipboard?.primaryClip
-                            if (clipData != null && clipData.itemCount > 0) {
-                                val text = clipData.getItemAt(0).text?.toString() ?: ""
-                                onUrlChange(text)
-                            }
-                        }) {
+                        IconButton(onClick = onPasteClick) {
                             Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.add_source_paste_desc), tint = GreenPrimary)
                         }
                     }
@@ -303,15 +291,6 @@ fun AddAppSourceScreen(
 
             // Fetched Release & Asset List
             if (fetchedRelease != null) {
-                val filteredAssets = remember(fetchedRelease, showApks, showModules) {
-                    fetchedRelease.assets.filter { asset ->
-                        when (asset.fileType) {
-                            AppFileType.APK -> showApks
-                            AppFileType.ZIP -> showModules
-                        }
-                    }
-                }
-
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -323,9 +302,9 @@ fun AddAppSourceScreen(
                         Text(
                             text = pluralStringResource(
                                 R.plurals.add_source_release_found_title,
-                                filteredAssets.size,
+                                releaseAssets.size,
                                 fetchedRelease.tag,
-                                filteredAssets.size
+                                releaseAssets.size
                             ),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
@@ -339,31 +318,23 @@ fun AddAppSourceScreen(
                         )
                     }
 
-                    items(filteredAssets, key = { "${it.releaseTag}/${it.name}" }) { asset ->
+                    items(releaseAssets, key = { "${it.releaseTag}/${it.name}" }) { asset ->
                         ReleaseAssetCard(asset = asset, onClick = { selectAsset(asset, fetchedRelease) })
                     }
 
                     // Older releases, only with files not already listed above
                     olderReleases.forEach { release ->
-                        val olderAssets = release.assets.filter { asset ->
-                            when (asset.fileType) {
-                                AppFileType.APK -> showApks
-                                AppFileType.ZIP -> showModules
-                            }
+                        item(key = "header/${release.tag}") {
+                            Text(
+                                text = stringResource(R.string.add_source_older_release_title, release.tag),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
                         }
-                        if (olderAssets.isNotEmpty()) {
-                            item(key = "header/${release.tag}") {
-                                Text(
-                                    text = stringResource(R.string.add_source_older_release_title, release.tag),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextSecondary,
-                                    modifier = Modifier.padding(top = 8.dp)
-                                )
-                            }
-                            items(olderAssets, key = { "${it.releaseTag}/${it.name}" }) { asset ->
-                                ReleaseAssetCard(asset = asset, onClick = { selectAsset(asset, release) })
-                            }
+                        items(release.assets, key = { "${it.releaseTag}/${it.name}" }) { asset ->
+                            ReleaseAssetCard(asset = asset, onClick = { selectAsset(asset, release) })
                         }
                     }
 
@@ -413,7 +384,7 @@ private fun ReleaseAssetCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = FormatHelper.deriveAppNameFromAsset(asset.name),
+                    text = asset.appName,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     color = TextPrimary,
@@ -449,9 +420,7 @@ private fun ReleaseAssetCard(
                         )
                     }
 
-                    val variant = remember(asset.name, asset.releaseTag) {
-                        BuildVariantHelper.resolveAssetVariant(asset.name, asset.releaseTag)
-                    }
+                    val variant = asset.variant
                     Box(
                         modifier = Modifier
                             .background(

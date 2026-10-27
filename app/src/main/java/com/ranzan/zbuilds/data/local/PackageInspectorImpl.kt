@@ -41,6 +41,8 @@ class PackageInspectorImpl(
         }
     }
 
+    override fun getOwnVersionName(): String? = getInstalledVersionName(context.packageName)
+
     override fun inspectApkPackageName(apkFilePath: String): String? {
         return try {
             val file = File(apkFilePath)

@@ -32,10 +32,7 @@
     <string name="home_status_checking">Checking…</string>
     <string name="home_status_downloading">Downloading</string>
     <string name="home_msg_all_up_to_date">All tracked apps are up to date</string>
-    <string name="home_msg_checking_updates">Checking for available updates…</string>
-    <string name="home_msg_checking">Checking for updates…</string>
     <string name="home_msg_check_failed">Failed to check updates: %1$s</string>
-    <string name="home_msg_checking_app">Checking %1$s for updates…</string>
     <string name="home_msg_app_update_available">Update available for %1$s (%2$s)</string>
     <string name="home_msg_app_up_to_date">%1$s is up to date</string>
     <string name="home_msg_app_removed">App removed from tracked list</string>

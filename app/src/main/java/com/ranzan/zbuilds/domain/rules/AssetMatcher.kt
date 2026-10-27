@@ -1,4 +1,4 @@
-package com.ranzan.zbuilds.core.utils
+package com.ranzan.zbuilds.domain.rules
 
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
@@ -25,7 +25,7 @@ object AssetMatcher {
     fun toPattern(assetName: String, releaseTag: String? = null): String {
         var pattern = assetName.trim().lowercase()
 
-        val cleanTag = releaseTag?.let { FormatHelper.cleanVersionString(it).lowercase() }.orEmpty()
+        val cleanTag = releaseTag?.let { VersionRules.cleanVersionString(it).lowercase() }.orEmpty()
         // Short tags like "1" would corrupt unrelated digits (e.g. "arm64"), so only strip meaningful tags
         if (cleanTag.length >= 3 && cleanTag.any { it.isDigit() }) {
             pattern = pattern.replace("v$cleanTag", VERSION_PLACEHOLDER)
@@ -71,10 +71,10 @@ object AssetMatcher {
 
         // 4. Closest name with the same arch and build variant, if similar enough
         val trackedTokens = tokensOf(targetPatterns.firstOrNull() ?: return null)
-        val trackedVariant = BuildVariantHelper.detectVariant(trackedAssetName)
+        val trackedVariant = BuildVariantRules.detectVariant(trackedAssetName)
         return candidates
             .filter { it.arch.equals(arch, ignoreCase = true) }
-            .filter { BuildVariantHelper.detectVariant(it.name) == trackedVariant }
+            .filter { BuildVariantRules.detectVariant(it.name) == trackedVariant }
             .map { it to similarity(trackedTokens, tokensOf(toPattern(it.name, it.releaseTag))) }
             .filter { (_, score) -> score >= MIN_SIMILARITY }
             .maxByOrNull { (_, score) -> score }

@@ -9,6 +9,7 @@ import com.ranzan.zbuilds.core.utils.FormatHelper
 import com.ranzan.zbuilds.domain.model.AppSettings
 import com.ranzan.zbuilds.domain.usecase.ClearCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.ClearDownloadCacheUseCase
+import com.ranzan.zbuilds.domain.usecase.GetAppVersionUseCase
 import com.ranzan.zbuilds.domain.usecase.GetCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.UpdateSettingsUseCase
@@ -24,7 +25,8 @@ class SettingsViewModel(
     private val clearDownloadCacheUseCase: ClearDownloadCacheUseCase,
     private val getCrashReportsUseCase: GetCrashReportsUseCase,
     private val clearCrashReportsUseCase: ClearCrashReportsUseCase,
-    private val crashReportHelper: CrashReportHelper
+    private val crashReportHelper: CrashReportHelper,
+    private val getAppVersionUseCase: GetAppVersionUseCase
 ) : BaseViewModel<SettingsUiState, SettingsUiAction, SettingsUiEffect>(SettingsUiState()) {
 
     companion object {
@@ -35,6 +37,7 @@ class SettingsViewModel(
     }
 
     init {
+        setState { copy(appVersion = getAppVersionUseCase()) }
         observeSettings()
         observeCrashReports()
     }
@@ -71,7 +74,6 @@ class SettingsViewModel(
                 viewModelScope.launch {
                     updateSettingsUseCase.updateGithubToken(token)
                     val msg = UiText.res(if (token != null) R.string.settings_msg_token_saved else R.string.settings_msg_token_cleared)
-                    setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
@@ -83,8 +85,7 @@ class SettingsViewModel(
                     setState {
                         copy(
                             tokenInput = "",
-                            tokenValidationMessage = null,
-                            snackbarMessage = msg
+                            tokenValidationMessage = null
                         )
                     }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
@@ -142,7 +143,6 @@ class SettingsViewModel(
             is SettingsUiAction.OnToggleBuildFormats -> {
                 if (!action.showApks && !action.showModules) {
                     val msg = UiText.res(R.string.settings_msg_formats_required)
-                    setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                     return
                 }
@@ -150,7 +150,6 @@ class SettingsViewModel(
                 viewModelScope.launch {
                     updateSettingsUseCase.updateBuildFormats(action.showApks, action.showModules)
                     val msg = UiText.res(R.string.settings_msg_formats_updated)
-                    setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
@@ -163,7 +162,6 @@ class SettingsViewModel(
                     } else {
                         UiText.res(R.string.settings_msg_folder_reset)
                     }
-                    setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
@@ -172,7 +170,6 @@ class SettingsViewModel(
                 viewModelScope.launch {
                     updateSettingsUseCase.updateAutoClean(action.enabled)
                     val msg = UiText.res(if (action.enabled) R.string.settings_msg_auto_clean_on else R.string.settings_msg_auto_clean_off)
-                    setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
@@ -181,7 +178,6 @@ class SettingsViewModel(
                 viewModelScope.launch {
                     updateSettingsUseCase.updateCleanupRetentionDays(action.days)
                     val msg = UiText.plural(R.plurals.settings_msg_retention_set, action.days, action.days)
-                    setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
@@ -194,22 +190,12 @@ class SettingsViewModel(
                         onSuccess = { freedBytes ->
                             val readable = FormatHelper.formatBytes(freedBytes)
                             val msg = UiText.res(R.string.settings_msg_storage_cleaned, readable)
-                            setState {
-                                copy(
-                                    isClearingCache = false,
-                                    snackbarMessage = msg
-                                )
-                            }
+                            setState { copy(isClearingCache = false) }
                             sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                         },
                         onFailure = { error ->
                             val msg = UiText.res(R.string.settings_msg_storage_clean_failed, error.toUiText())
-                            setState {
-                                copy(
-                                    isClearingCache = false,
-                                    snackbarMessage = msg
-                                )
-                            }
+                            setState { copy(isClearingCache = false) }
                             sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                         }
                     )
@@ -220,7 +206,6 @@ class SettingsViewModel(
                 viewModelScope.launch {
                     clearCrashReportsUseCase()
                     val msg = UiText.res(R.string.settings_msg_crashes_cleared)
-                    setState { copy(snackbarMessage = msg) }
                     sendEffect(SettingsUiEffect.ShowSnackbar(msg))
                 }
             }
@@ -241,9 +226,6 @@ class SettingsViewModel(
                 sendEffect(SettingsUiEffect.ShareText(UiText.res(R.string.settings_crash_share_title), markdown))
             }
 
-            is SettingsUiAction.OnClearSnackbar -> {
-                setState { copy(snackbarMessage = null) }
-            }
 
             is SettingsUiAction.OnNavigateBackClick -> {
                 sendEffect(SettingsUiEffect.NavigateBack)

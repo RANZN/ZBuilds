@@ -4,6 +4,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Display formatting for sizes and dates.
+ */
 object FormatHelper {
 
     fun formatBytes(bytes: Long): String {
@@ -21,51 +24,5 @@ object FormatHelper {
         if (timestampMs <= 0) return null
         val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
         return sdf.format(Date(timestampMs))
-    }
-
-    fun cleanVersionString(version: String): String {
-        return version.trim().removePrefix("v").removePrefix("V")
-    }
-
-    private val assetVersionRegex = Regex("""(?<![a-z0-9])v?(\d+(?:\.\d+)+)""", RegexOption.IGNORE_CASE)
-
-    /**
-     * Extracts the build version from an asset file name or tag,
-     * e.g. "reddit-morphe-v2026.24.0-all.apk" -> "2026.24.0". Returns null if none is present.
-     */
-    fun versionFromAssetName(name: String): String? =
-        assetVersionRegex.find(name)?.groupValues?.get(1)
-
-    /**
-     * Determines a clean display name from an APK or ZIP filename
-     */
-    fun deriveAppNameFromAsset(fileName: String): String {
-        var base = fileName
-            .removeSuffix(".apk")
-            .removeSuffix(".zip")
-            .replace("-release", "", ignoreCase = true)
-            .replace("-unsigned", "", ignoreCase = true)
-            .replace("-signed", "", ignoreCase = true)
-            .replace("_release", "", ignoreCase = true)
-            .replace("_unsigned", "", ignoreCase = true)
-
-        // Replace architecture markers
-        listOf("arm64-v8a", "armeabi-v7a", "arm64", "armv7", "x86_64", "x86", "all", "universal").forEach {
-            base = base.replace("-$it", "", ignoreCase = true)
-                .replace("_$it", "", ignoreCase = true)
-                .replace(it, "", ignoreCase = true)
-        }
-
-        // Clean trailing version numbers (e.g. -v21.20.405)
-        base = base.replace(Regex("[-_]v?\\d+(\\.\\d+)+.*$"), "")
-        base = base.replace(Regex("[-_]"), " ").trim()
-
-        if (base.isBlank()) {
-            base = fileName.removeSuffix(".apk").removeSuffix(".zip")
-        }
-
-        return base.split(" ")
-            .filter { it.isNotBlank() }
-            .joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
     }
 }

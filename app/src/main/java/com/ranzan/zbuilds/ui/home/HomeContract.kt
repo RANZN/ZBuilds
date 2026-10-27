@@ -4,6 +4,7 @@ import com.ranzan.zbuilds.core.base.UiAction
 import com.ranzan.zbuilds.core.base.UiEffect
 import com.ranzan.zbuilds.core.base.UiState
 import com.ranzan.zbuilds.core.base.UiText
+import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
@@ -27,11 +28,30 @@ data class HomeUiState(
     val fetchedRelease: SourceRelease? = null,
     val fetchedSourceUrl: String = "",
     val olderReleases: OlderReleasesState = OlderReleasesState(),
-    val addSourceError: UiText? = null,
-    val statusMessage: UiText? = null
+    val addSourceError: UiText? = null
 ) : UiState {
     val updateCount: Int
         get() = trackedApps.count { it.hasUpdate }
+
+    val isAnyUpdateDownloading: Boolean
+        get() = trackedApps.any { app -> app.hasUpdate && downloadProgressMap[app.id] is DownloadProgress.Downloading }
+
+    /** Latest release files allowed by the APK / module setting. */
+    val visibleReleaseAssets: List<ReleaseAsset>
+        get() = fetchedRelease?.assets.orEmpty().filter(::isFileTypeShown)
+
+    /** Older releases with only the files allowed by the APK / module setting. */
+    val visibleOlderReleases: List<SourceRelease>
+        get() = olderReleases.releases.mapNotNull { release ->
+            release.assets.filter(::isFileTypeShown)
+                .takeIf { it.isNotEmpty() }
+                ?.let { release.copy(assets = it) }
+        }
+
+    private fun isFileTypeShown(asset: ReleaseAsset): Boolean = when (asset.fileType) {
+        AppFileType.APK -> showApks
+        AppFileType.ZIP -> showModules
+    }
 }
 
 /**
@@ -53,16 +73,15 @@ sealed interface HomeUiAction : UiAction {
     data object OnCloseAddSource : HomeUiAction
     data class OnSourceUrlChange(val url: String) : HomeUiAction
     data object OnFetchSourceReleases : HomeUiAction
+    data object OnPasteSourceUrlClick : HomeUiAction
     data object OnLoadOlderReleases : HomeUiAction
     data class OnSelectAssetToTrack(val asset: ReleaseAsset, val release: SourceRelease, val customName: String? = null) : HomeUiAction
     data class OnDownloadApp(val app: TrackedApp) : HomeUiAction
     data class OnCancelDownload(val appId: String) : HomeUiAction
     data class OnDeleteTrackedApp(val appId: String) : HomeUiAction
-    data object OnCheckAllUpdates : HomeUiAction
     data class OnCheckAppUpdate(val app: TrackedApp) : HomeUiAction
     data object OnUpdateAll : HomeUiAction
     data object OnResume : HomeUiAction
-    data object OnClearStatusMessage : HomeUiAction
     data object OnSettingsClick : HomeUiAction
 
     // App Actions (delegated to effect handler in host)
@@ -76,6 +95,7 @@ typealias HomeUiEvent = HomeUiAction
 
 sealed interface HomeUiEffect : UiEffect {
     data object NavigateToSettings : HomeUiEffect
+    data object RequestPasteSourceUrl : HomeUiEffect
     data class ShowSnackbar(val message: UiText) : HomeUiEffect
     data class InstallApk(val filePath: String) : HomeUiEffect
     data class OpenApp(val packageName: String) : HomeUiEffect

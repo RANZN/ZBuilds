@@ -1,9 +1,10 @@
 package com.ranzan.zbuilds
 
-import com.ranzan.zbuilds.core.utils.AssetMatcher
 import com.ranzan.zbuilds.domain.model.AppFileType
+import com.ranzan.zbuilds.domain.model.BuildVariant
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
+import com.ranzan.zbuilds.domain.rules.AssetMatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -13,10 +14,12 @@ class AssetMatcherTest {
     private fun asset(name: String, tag: String, arch: String = "all", type: AppFileType = AppFileType.APK) =
         ReleaseAsset(
             name = name,
+            appName = name,
             downloadUrl = "https://example.com/$tag/$name",
             sizeBytes = 1L,
             fileType = type,
             arch = arch,
+            variant = BuildVariant.RELEASE,
             releaseTag = tag
         )
 

@@ -1,8 +1,5 @@
 package com.ranzan.zbuilds.domain.model
 
-import kotlinx.serialization.Serializable
-
-@Serializable
 data class TrackedApp(
     val id: String,
     val name: String,

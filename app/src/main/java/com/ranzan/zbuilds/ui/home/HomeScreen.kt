@@ -68,6 +68,7 @@ import com.ranzan.zbuilds.ui.theme.TextMuted
 import com.ranzan.zbuilds.ui.theme.TextPrimary
 import com.ranzan.zbuilds.ui.theme.TextSecondary
 import com.ranzan.zbuilds.ui.theme.ZBuildsTheme
+import com.ranzan.zbuilds.ui.util.ClipboardHelper
 import com.ranzan.zbuilds.ui.util.FileIntentHelper
 import org.koin.androidx.compose.koinViewModel
 
@@ -93,6 +94,9 @@ fun HomeScreenHost(
         viewModel.uiEffect.collect { effect ->
             when (effect) {
                 is HomeUiEffect.NavigateToSettings -> onSettingsClick()
+                is HomeUiEffect.RequestPasteSourceUrl -> ClipboardHelper.readText(context)?.let {
+                    viewModel.onAction(HomeUiAction.OnSourceUrlChange(it))
+                }
                 is HomeUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message.asString(context))
                 is HomeUiEffect.InstallApk -> FileIntentHelper.installApk(context, effect.filePath)
                 is HomeUiEffect.OpenApp -> FileIntentHelper.openApp(context, effect.packageName)
@@ -110,15 +114,15 @@ fun HomeScreenHost(
             sourceUrl = state.addSourceUrl,
             isFetching = state.isFetchingSource,
             fetchedRelease = state.fetchedRelease,
+            releaseAssets = state.visibleReleaseAssets,
             errorMessage = state.addSourceError?.asString(),
-            olderReleases = state.olderReleases.releases,
+            olderReleases = state.visibleOlderReleases,
             isLoadingOlder = state.olderReleases.isLoading,
             hasMoreOlder = state.olderReleases.hasMore,
             olderMessage = state.olderReleases.message?.asString(),
             suggestions = state.suggestions,
-            showApks = state.showApks,
-            showModules = state.showModules,
             onUrlChange = { viewModel.onAction(HomeUiAction.OnSourceUrlChange(it)) },
+            onPasteClick = { viewModel.onAction(HomeUiAction.OnPasteSourceUrlClick) },
             onFetchClick = { viewModel.onAction(HomeUiAction.OnFetchSourceReleases) },
             onLoadOlderClick = { viewModel.onAction(HomeUiAction.OnLoadOlderReleases) },
             onSelectAsset = { asset, release ->
@@ -155,12 +159,6 @@ fun HomeScreen(
     val handleAction: (HomeUiAction) -> Unit = { action ->
         if (action !is HomeUiAction.OnSearchQueryChange) focusManager.clearFocus()
         onAction(action)
-    }
-
-    val isAnyUpdateDownloading = remember(state.downloadProgressMap, state.trackedApps) {
-        state.trackedApps.any { app ->
-            app.hasUpdate && state.downloadProgressMap[app.id] is DownloadProgress.Downloading
-        }
     }
 
     Scaffold(
@@ -243,7 +241,7 @@ fun HomeScreen(
                             updateCount = state.updateCount,
                             totalAppsCount = state.trackedApps.size,
                             isRefreshing = state.isRefreshing,
-                            isDownloading = isAnyUpdateDownloading,
+                            isDownloading = state.isAnyUpdateDownloading,
                             onUpdateClick = { handleAction(HomeUiAction.OnUpdateAll) }
                         )
                     }

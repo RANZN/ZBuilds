@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Environment
 import com.ranzan.zbuilds.data.local.SettingsDataStore
 import com.ranzan.zbuilds.data.remote.GitHubApiService
+import com.ranzan.zbuilds.data.remote.mapper.toDomain
 import com.ranzan.zbuilds.domain.model.AppSettings
 import com.ranzan.zbuilds.domain.model.GithubTokenStatus
 import com.ranzan.zbuilds.domain.repository.SettingsRepository
@@ -79,6 +80,6 @@ class SettingsRepositoryImpl(
     }
 
     override suspend fun validateGithubToken(token: String): Result<GithubTokenStatus> {
-        return gitHubApiService.validateToken(token)
+        return gitHubApiService.validateToken(token).map { it.toDomain() }
     }
 }

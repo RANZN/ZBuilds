@@ -14,8 +14,8 @@ data class SettingsUiState(
     val tokenValidationMessage: UiText? = null,
     val isTokenValid: Boolean = false,
     val isClearingCache: Boolean = false,
-    val snackbarMessage: UiText? = null,
-    val crashReports: List<CrashReport> = emptyList()
+    val crashReports: List<CrashReport> = emptyList(),
+    val appVersion: String? = null
 ) : UiState
 
 sealed interface SettingsUiAction : UiAction {
@@ -29,7 +29,6 @@ sealed interface SettingsUiAction : UiAction {
     data class OnToggleAutoClean(val enabled: Boolean) : SettingsUiAction
     data class OnSelectRetentionDays(val days: Int) : SettingsUiAction
     data object OnClearCache : SettingsUiAction
-    data object OnClearSnackbar : SettingsUiAction
 
     // Local Crash Reporting actions (FOSS)
     data object OnClearCrashReports : SettingsUiAction
