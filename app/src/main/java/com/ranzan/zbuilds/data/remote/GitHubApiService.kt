@@ -99,6 +99,47 @@ class GitHubApiService(
         }
     }
 
+    /**
+     * Fetches one page of releases (newest first), keeping only APK/ZIP assets.
+     * Used to load older releases on demand.
+     */
+    suspend fun fetchReleasePage(
+        sourceUrl: String,
+        page: Int,
+        perPage: Int
+    ): Result<List<SourceRelease>> = withContext(Dispatchers.IO) {
+        try {
+            val (owner, repo) = SourceUrlParser.parseGitHubRepo(sourceUrl)
+                ?: return@withContext Result.failure(IllegalArgumentException("Invalid GitHub repository URL: $sourceUrl"))
+
+            val apiUrl = "${SourceUrlParser.toReleasesApiUrl(owner, repo)}?per_page=$perPage&page=$page"
+            val token = getAuthToken()
+
+            val requestBuilder = Request.Builder()
+                .url(apiUrl)
+                .header("Accept", "application/vnd.github.v3+json")
+                .header("User-Agent", "ZBuilds-Android-App")
+                .get()
+
+            if (!token.isNullOrBlank()) {
+                requestBuilder.header("Authorization", "Bearer $token")
+            }
+
+            val response = client.newCall(requestBuilder.build()).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(
+                    IOException("GitHub API returned error code ${response.code}: ${response.message}")
+                )
+            }
+
+            val body = response.body?.string().orEmpty()
+            val releases = json.decodeFromString<List<GitHubReleaseDto>>(body)
+            Result.success(releases.map { mapToSourceRelease(it) })
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun fetchLatestRelease(owner: String, repo: String): Result<SourceRelease> = withContext(Dispatchers.IO) {
         try {
             val apiUrl = SourceUrlParser.toReleasesApiUrl(owner, repo)

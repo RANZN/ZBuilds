@@ -10,6 +10,7 @@ interface AppRepository {
     suspend fun updateTrackedApp(app: TrackedApp)
     suspend fun deleteTrackedApp(id: String)
     suspend fun fetchSourceReleases(sourceUrl: String): Result<SourceRelease>
+    suspend fun fetchReleasePage(sourceUrl: String, page: Int, perPage: Int): Result<List<SourceRelease>>
     suspend fun checkForUpdates(): Result<List<TrackedApp>>
     suspend fun checkAppUpdate(app: TrackedApp): Result<TrackedApp>
 }

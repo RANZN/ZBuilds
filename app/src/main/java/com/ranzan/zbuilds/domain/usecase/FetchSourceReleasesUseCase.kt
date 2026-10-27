@@ -8,4 +8,7 @@ class FetchSourceReleasesUseCase(
 ) {
     suspend operator fun invoke(sourceUrl: String): Result<SourceRelease> =
         appRepository.fetchSourceReleases(sourceUrl)
+
+    suspend fun fetchReleasePage(sourceUrl: String, page: Int, perPage: Int): Result<List<SourceRelease>> =
+        appRepository.fetchReleasePage(sourceUrl, page, perPage)
 }

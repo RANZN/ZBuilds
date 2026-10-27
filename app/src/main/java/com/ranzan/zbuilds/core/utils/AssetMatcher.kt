@@ -2,6 +2,7 @@ package com.ranzan.zbuilds.core.utils
 
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
+import com.ranzan.zbuilds.domain.model.SourceRelease
 
 /**
  * Picks the asset in a new release that corresponds to the file a user originally tracked.
@@ -79,6 +80,25 @@ object AssetMatcher {
             .maxByOrNull { (_, score) -> score }
             ?.first
     }
+
+    /**
+     * Keeps only assets whose version-independent pattern is not in [knownPatterns],
+     * so older releases only contribute files that are not already listed.
+     * Releases left without assets are dropped.
+     */
+    fun filterNewAssets(releases: List<SourceRelease>, knownPatterns: Set<String>): List<SourceRelease> {
+        val seen = knownPatterns.toMutableSet()
+        return releases.mapNotNull { release ->
+            val newAssets = release.assets.filter { asset -> seen.add(toPattern(asset.name, asset.releaseTag)) }
+            if (newAssets.isEmpty()) null else release.copy(assets = newAssets)
+        }
+    }
+
+    /**
+     * Version-independent patterns of every asset in [releases].
+     */
+    fun patternsOf(releases: List<SourceRelease>): Set<String> =
+        releases.flatMap { release -> release.assets.map { toPattern(it.name, it.releaseTag) } }.toSet()
 
     private fun tokensOf(pattern: String): Set<String> =
         pattern.split(tokenSplitRegex)

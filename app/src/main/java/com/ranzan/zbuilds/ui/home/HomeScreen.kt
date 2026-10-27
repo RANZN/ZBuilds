@@ -110,11 +110,16 @@ fun HomeScreenHost(
             isFetching = state.isFetchingSource,
             fetchedRelease = state.fetchedRelease,
             errorMessage = state.addSourceError,
+            olderReleases = state.olderReleases.releases,
+            isLoadingOlder = state.olderReleases.isLoading,
+            hasMoreOlder = state.olderReleases.hasMore,
+            olderMessage = state.olderReleases.message,
             suggestions = state.suggestions,
             showApks = state.showApks,
             showModules = state.showModules,
             onUrlChange = { viewModel.onAction(HomeUiAction.OnSourceUrlChange(it)) },
             onFetchClick = { viewModel.onAction(HomeUiAction.OnFetchSourceReleases) },
+            onLoadOlderClick = { viewModel.onAction(HomeUiAction.OnLoadOlderReleases) },
             onSelectAsset = { asset, release ->
                 viewModel.onAction(HomeUiAction.OnSelectAssetToTrack(asset, release))
             },

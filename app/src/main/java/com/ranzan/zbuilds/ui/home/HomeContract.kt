@@ -24,12 +24,26 @@ data class HomeUiState(
     val addSourceUrl: String = "",
     val isFetchingSource: Boolean = false,
     val fetchedRelease: SourceRelease? = null,
+    val fetchedSourceUrl: String = "",
+    val olderReleases: OlderReleasesState = OlderReleasesState(),
     val addSourceError: String? = null,
     val statusMessage: String? = null
 ) : UiState {
     val updateCount: Int
         get() = trackedApps.count { it.hasUpdate }
 }
+
+/**
+ * Older releases loaded on demand on the Add App Source screen.
+ * [releases] only hold files whose name pattern is not already listed.
+ */
+data class OlderReleasesState(
+    val releases: List<SourceRelease> = emptyList(),
+    val lastLoadedPage: Int = 0,
+    val hasMore: Boolean = true,
+    val isLoading: Boolean = false,
+    val message: String? = null
+)
 
 sealed interface HomeUiAction : UiAction {
     data class OnSearchQueryChange(val query: String) : HomeUiAction
@@ -38,6 +52,7 @@ sealed interface HomeUiAction : UiAction {
     data object OnCloseAddSheet : HomeUiAction
     data class OnSourceUrlChange(val url: String) : HomeUiAction
     data object OnFetchSourceReleases : HomeUiAction
+    data object OnLoadOlderReleases : HomeUiAction
     data class OnSelectAssetToTrack(val asset: ReleaseAsset, val release: SourceRelease, val customName: String? = null) : HomeUiAction
     data class OnDownloadApp(val app: TrackedApp) : HomeUiAction
     data class OnCancelDownload(val appId: String) : HomeUiAction

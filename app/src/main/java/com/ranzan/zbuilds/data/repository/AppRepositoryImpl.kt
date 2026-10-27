@@ -51,6 +51,10 @@ class AppRepositoryImpl(
         return gitHubApiService.fetchReleases(sourceUrl)
     }
 
+    override suspend fun fetchReleasePage(sourceUrl: String, page: Int, perPage: Int): Result<List<SourceRelease>> {
+        return gitHubApiService.fetchReleasePage(sourceUrl, page, perPage)
+    }
+
     override suspend fun checkForUpdates(): Result<List<TrackedApp>> {
         return try {
             val currentApps = trackedAppsDataStore.getTrackedApps().first()

@@ -17,6 +17,7 @@ import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -30,6 +31,8 @@ class HomeViewModel(
     private val getSourceSuggestionsUseCase: GetSourceSuggestionsUseCase,
     private val getSettingsUseCase: GetSettingsUseCase
 ) : BaseViewModel<HomeUiState, HomeUiAction, HomeUiEffect>(HomeUiState()) {
+
+    private var olderReleasesJob: Job? = null
 
     init {
         // Collect tracked apps from DataStore
@@ -92,17 +95,20 @@ class HomeViewModel(
                     copy(
                         isAddSheetOpen = true,
                         addSourceError = null,
-                        fetchedRelease = null
+                        fetchedRelease = null,
+                        olderReleases = OlderReleasesState()
                     )
                 }
             }
             is HomeUiAction.OnCloseAddSheet -> {
+                olderReleasesJob?.cancel()
                 setState {
                     copy(
                         isAddSheetOpen = false,
                         addSourceUrl = "",
                         isFetchingSource = false,
                         fetchedRelease = null,
+                        olderReleases = OlderReleasesState(),
                         addSourceError = null
                     )
                 }
@@ -117,6 +123,9 @@ class HomeViewModel(
             }
             is HomeUiAction.OnFetchSourceReleases -> {
                 fetchSourceReleases()
+            }
+            is HomeUiAction.OnLoadOlderReleases -> {
+                loadOlderReleases()
             }
             is HomeUiAction.OnSelectAssetToTrack -> {
                 trackAndDownloadAsset(action.asset, action.release, action.customName)
@@ -285,6 +294,62 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * Loads older release pages and appends only files not already listed.
+     * Keeps paging (up to [MAX_PAGES_PER_LOAD]) until at least one new file is found.
+     */
+    private fun loadOlderReleases() {
+        val latestRelease = currentState.fetchedRelease ?: return
+        val sourceUrl = currentState.fetchedSourceUrl
+        val older = currentState.olderReleases
+        if (sourceUrl.isBlank() || older.isLoading || !older.hasMore) return
+
+        olderReleasesJob = viewModelScope.launch {
+            setState { copy(olderReleases = olderReleases.copy(isLoading = true, message = null)) }
+
+            var page = older.lastLoadedPage
+            var hasMore = true
+            val knownPatterns = AssetMatcher.patternsOf(listOf(latestRelease) + older.releases).toMutableSet()
+            val newReleases = mutableListOf<SourceRelease>()
+            var error: String? = null
+
+            while (hasMore && newReleases.isEmpty() && page - older.lastLoadedPage < MAX_PAGES_PER_LOAD) {
+                val result = fetchSourceReleasesUseCase.fetchReleasePage(sourceUrl, page + 1, RELEASES_PER_PAGE)
+                if (result.isFailure) {
+                    error = result.exceptionOrNull()?.message ?: "Failed to load older releases"
+                    break
+                }
+                page++
+                val releases = result.getOrThrow()
+                hasMore = releases.size == RELEASES_PER_PAGE
+
+                val olderOnly = releases.filter { it.tag != latestRelease.tag }
+                val filtered = AssetMatcher.filterNewAssets(olderOnly, knownPatterns)
+                knownPatterns += AssetMatcher.patternsOf(filtered)
+                newReleases += filtered
+            }
+
+            val message = when {
+                error != null -> error
+                newReleases.isNotEmpty() -> null
+                hasMore -> "No new files in the last ${page - older.lastLoadedPage} pages of older releases. Tap again to keep looking."
+                else -> "No other files found in older releases"
+            }
+
+            setState {
+                copy(
+                    olderReleases = olderReleases.copy(
+                        releases = olderReleases.releases + newReleases,
+                        lastLoadedPage = page,
+                        hasMore = hasMore,
+                        isLoading = false,
+                        message = message
+                    )
+                )
+            }
+        }
+    }
+
     private fun fetchSourceReleases() {
         val url = currentState.addSourceUrl.trim()
         if (url.isBlank()) {
@@ -292,8 +357,9 @@ class HomeViewModel(
             return
         }
 
+        olderReleasesJob?.cancel()
         viewModelScope.launch {
-            setState { copy(isFetchingSource = true, addSourceError = null) }
+            setState { copy(isFetchingSource = true, addSourceError = null, olderReleases = OlderReleasesState()) }
 
             val result = fetchSourceReleasesUseCase(url)
             if (result.isSuccess) {
@@ -302,6 +368,7 @@ class HomeViewModel(
                     copy(
                         isFetchingSource = false,
                         fetchedRelease = release,
+                        fetchedSourceUrl = url,
                         addSourceError = if (release?.assets.isNullOrEmpty()) "No APK or ZIP assets found in this release" else null
                     )
                 }
@@ -417,5 +484,10 @@ class HomeViewModel(
 
             matchesQuery && matchesFormat
         }
+    }
+
+    private companion object {
+        const val RELEASES_PER_PAGE = 10
+        const val MAX_PAGES_PER_LOAD = 3
     }
 }

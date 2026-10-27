@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
@@ -46,6 +47,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -92,11 +94,16 @@ fun AddAppSourceScreen(
     isFetching: Boolean,
     fetchedRelease: SourceRelease?,
     errorMessage: String?,
+    olderReleases: List<SourceRelease> = emptyList(),
+    isLoadingOlder: Boolean = false,
+    hasMoreOlder: Boolean = false,
+    olderMessage: String? = null,
     suggestions: List<SourceSuggestion> = emptyList(),
     showApks: Boolean = true,
     showModules: Boolean = true,
     onUrlChange: (String) -> Unit,
     onFetchClick: () -> Unit,
+    onLoadOlderClick: () -> Unit = {},
     onSelectAsset: (ReleaseAsset, SourceRelease) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -108,6 +115,10 @@ fun AddAppSourceScreen(
     val fetch = {
         focusManager.clearFocus()
         onFetchClick()
+    }
+    val loadOlder = {
+        focusManager.clearFocus()
+        onLoadOlderClick()
     }
     val selectAsset = { asset: ReleaseAsset, release: SourceRelease ->
         focusManager.clearFocus()
@@ -320,112 +331,201 @@ fun AddAppSourceScreen(
                         .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredAssets, key = { it.name }) { asset ->
-                        Card(
-                            onClick = { selectAsset(asset, fetchedRelease) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                            border = BorderStroke(1.dp, DarkCardBorder)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (asset.fileType == AppFileType.APK) Icons.Default.Android else Icons.Default.FolderZip,
-                                    contentDescription = null,
-                                    tint = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
-                                    modifier = Modifier.size(26.dp)
-                                )
+                    items(filteredAssets, key = { "${it.releaseTag}/${it.name}" }) { asset ->
+                        ReleaseAssetCard(asset = asset, onClick = { selectAsset(asset, fetchedRelease) })
+                    }
 
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = FormatHelper.deriveAppNameFromAsset(asset.name),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = TextPrimary,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.padding(top = 3.dp)
-                                    ) {
-                                        // Badge
-                                        Box(
-                                            modifier = Modifier
-                                                .background(
-                                                    if (asset.fileType == AppFileType.APK) AccentBlue.copy(alpha = 0.2f) else AccentOrange.copy(alpha = 0.2f),
-                                                    RoundedCornerShape(4.dp)
-                                                )
-                                                .padding(horizontal = 5.dp, vertical = 1.dp)
-                                        ) {
-                                            Text(
-                                                asset.fileType.displayName,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (asset.fileType == AppFileType.APK) AccentBlue else AccentOrange
-                                            )
-                                        }
-
-                                        val variant = remember(asset.name, asset.releaseTag) {
-                                            BuildVariantHelper.resolveAssetVariant(asset.name, asset.releaseTag)
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .background(
-                                                    if (variant == BuildVariant.DEBUG) AccentOrange.copy(alpha = 0.2f) else AccentGreen.copy(alpha = 0.2f),
-                                                    RoundedCornerShape(4.dp)
-                                                )
-                                                .padding(horizontal = 5.dp, vertical = 1.dp)
-                                        ) {
-                                            Text(
-                                                text = stringResource(if (variant == BuildVariant.DEBUG) R.string.badge_variant_debug else R.string.badge_variant_release),
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (variant == BuildVariant.DEBUG) AccentOrange else AccentGreen
-                                            )
-                                        }
-
-                                        Text(
-                                            text = "${asset.arch} • ${FormatHelper.formatBytes(asset.sizeBytes)}",
-                                            fontSize = 11.sp,
-                                            color = TextSecondary
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .background(
-                                            if (asset.fileType == AppFileType.APK) GreenPrimary.copy(alpha = 0.15f) else AccentOrange.copy(alpha = 0.15f),
-                                            RoundedCornerShape(8.dp)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Download,
-                                        contentDescription = "Download",
-                                        tint = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                    // Older releases, only with files not already listed above
+                    olderReleases.forEach { release ->
+                        val olderAssets = release.assets.filter { asset ->
+                            when (asset.fileType) {
+                                AppFileType.APK -> showApks
+                                AppFileType.ZIP -> showModules
                             }
                         }
+                        if (olderAssets.isNotEmpty()) {
+                            item(key = "header/${release.tag}") {
+                                Text(
+                                    text = "Older release: ${release.tag}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
+                            items(olderAssets, key = { "${it.releaseTag}/${it.name}" }) { asset ->
+                                ReleaseAssetCard(asset = asset, onClick = { selectAsset(asset, release) })
+                            }
+                        }
+                    }
+
+                    item(key = "load_older") {
+                        LoadOlderFooter(
+                            isLoading = isLoadingOlder,
+                            hasMore = hasMoreOlder,
+                            message = olderMessage,
+                            onLoadOlder = loadOlder
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+
+@Composable
+private fun ReleaseAssetCard(
+    asset: ReleaseAsset,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+        border = BorderStroke(1.dp, DarkCardBorder)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (asset.fileType == AppFileType.APK) Icons.Default.Android else Icons.Default.FolderZip,
+                contentDescription = null,
+                tint = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
+                modifier = Modifier.size(26.dp)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = FormatHelper.deriveAppNameFromAsset(asset.name),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = TextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 3.dp)
+                ) {
+                    // Badge
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (asset.fileType == AppFileType.APK) AccentBlue.copy(alpha = 0.2f) else AccentOrange.copy(alpha = 0.2f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            asset.fileType.displayName,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (asset.fileType == AppFileType.APK) AccentBlue else AccentOrange
+                        )
+                    }
+
+                    val variant = remember(asset.name, asset.releaseTag) {
+                        BuildVariantHelper.resolveAssetVariant(asset.name, asset.releaseTag)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (variant == BuildVariant.DEBUG) AccentOrange.copy(alpha = 0.2f) else AccentGreen.copy(alpha = 0.2f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = stringResource(if (variant == BuildVariant.DEBUG) R.string.badge_variant_debug else R.string.badge_variant_release),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (variant == BuildVariant.DEBUG) AccentOrange else AccentGreen
+                        )
+                    }
+
+                    Text(
+                        text = "${asset.arch} • ${FormatHelper.formatBytes(asset.sizeBytes)}",
+                        fontSize = 11.sp,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(
+                        if (asset.fileType == AppFileType.APK) GreenPrimary.copy(alpha = 0.15f) else AccentOrange.copy(alpha = 0.15f),
+                        RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = "Download",
+                    tint = if (asset.fileType == AppFileType.APK) GreenPrimary else AccentOrange,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadOlderFooter(
+    isLoading: Boolean,
+    hasMore: Boolean,
+    message: String?,
+    onLoadOlder: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (message != null) {
+            Text(
+                text = message,
+                fontSize = 12.sp,
+                color = TextSecondary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+        if (hasMore) {
+            OutlinedButton(
+                onClick = onLoadOlder,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, DarkCardBorder)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = GreenPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Loading older releases...", fontSize = 13.sp, color = TextSecondary)
+                } else {
+                    Icon(Icons.Default.History, contentDescription = null, tint = GreenPrimary, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Load older releases", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = GreenPrimary)
+                }
+            }
         }
     }
 }

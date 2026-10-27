@@ -3,6 +3,7 @@ package com.ranzan.zbuilds
 import com.ranzan.zbuilds.core.utils.AssetMatcher
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
+import com.ranzan.zbuilds.domain.model.SourceRelease
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -87,5 +88,30 @@ class AssetMatcherTest {
             asset("Instagram-Patched-300.0.apk", "v2.0")
         )
         assertNull(match("YouTube-Morphe-21.20.405.apk", "v1.0", "all", release))
+    }
+
+    private fun release(tag: String, vararg names: String) =
+        SourceRelease(tag = tag, title = tag, publishedAt = "", body = "", assets = names.map { asset(it, tag) })
+
+    @Test
+    fun `filterNewAssets keeps only files not already listed`() {
+        val latest = release("v3.0", "YouTube-Morphe-3.0.apk", "Music-Morphe-3.0.apk")
+        val older = listOf(
+            release("v2.0", "YouTube-Morphe-2.0.apk", "Reddit-Morphe-2.0.apk"),
+            release("v1.0", "Music-Morphe-1.0.apk", "Reddit-Morphe-1.0.apk", "Twitch-Morphe-1.0.apk")
+        )
+
+        val result = AssetMatcher.filterNewAssets(older, AssetMatcher.patternsOf(listOf(latest)))
+
+        assertEquals(listOf("v2.0", "v1.0"), result.map { it.tag })
+        assertEquals(listOf("Reddit-Morphe-2.0.apk"), result[0].assets.map { it.name })
+        assertEquals(listOf("Twitch-Morphe-1.0.apk"), result[1].assets.map { it.name })
+    }
+
+    @Test
+    fun `filterNewAssets drops releases with nothing new`() {
+        val latest = release("v2.0", "app-2.0.apk")
+        val older = listOf(release("v1.0", "app-1.0.apk"))
+        assertEquals(emptyList<SourceRelease>(), AssetMatcher.filterNewAssets(older, AssetMatcher.patternsOf(listOf(latest))))
     }
 }
