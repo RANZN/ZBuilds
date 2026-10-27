@@ -312,26 +312,33 @@ fun AddAppSourceScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = pluralStringResource(R.plurals.add_source_release_found_title, filteredAssets.size, fetchedRelease.tag, filteredAssets.size),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AccentGreen
-                )
-                Text(
-                    text = stringResource(R.string.add_source_select_instruction),
-                    fontSize = 12.sp,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
-                )
-
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = pluralStringResource(
+                                R.plurals.add_source_release_found_title,
+                                filteredAssets.size,
+                                fetchedRelease.tag,
+                                filteredAssets.size
+                            ),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentGreen
+                        )
+                        Text(
+                            text = stringResource(R.string.add_source_select_instruction),
+                            fontSize = 12.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        )
+                    }
+
                     items(filteredAssets, key = { "${it.releaseTag}/${it.name}" }) { asset ->
                         ReleaseAssetCard(asset = asset, onClick = { selectAsset(asset, fetchedRelease) })
                     }
@@ -412,6 +419,13 @@ private fun ReleaseAssetCard(
                     color = TextPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
+                )
+                // Full file name exactly as published on the server
+                Text(
+                    text = asset.name,
+                    fontSize = 11.sp,
+                    color = TextMuted,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
