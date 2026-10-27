@@ -48,6 +48,7 @@
     <string name="card_btn_cancel_download">Cancel Download</string>
     <string name="card_btn_update_now">Update Now</string>
     <string name="card_btn_install_apk">Install APK</string>
+    <string name="card_btn_installed">Installed</string>
     <string name="card_btn_download_apk">Download APK</string>
     <string name="card_btn_open_app">Open App</string>
     <string name="card_btn_flash_zip">Flash / Open ZIP</string>
@@ -66,6 +67,10 @@
     <string name="sheet_release_found_title">Release: %1$s (%2$d downloads found)</string>
     <string name="sheet_select_instruction">Select what you want to download and add to home screen:</string>
     <string name="sheet_download_desc">Download</string>
+    <string name="add_source_back_desc">Back</string>
+    <string name="add_source_older_release_title">Older release: %1$s</string>
+    <string name="add_source_btn_load_older">Load older releases</string>
+    <string name="add_source_loading_older">Loading older releases…</string>
     <string name="badge_variant_debug">Debug</string>
     <string name="badge_variant_release">Release</string>
 

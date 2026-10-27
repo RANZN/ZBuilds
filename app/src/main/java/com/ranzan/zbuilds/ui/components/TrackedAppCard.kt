@@ -56,6 +56,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.core.utils.FormatHelper
+import com.ranzan.zbuilds.core.utils.downloadedBuildVersion
+import com.ranzan.zbuilds.core.utils.isLatestBuildInstalled
+import com.ranzan.zbuilds.core.utils.latestBuildVersion
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
@@ -390,18 +393,31 @@ fun TrackedAppCard(
                     }
                 } else if (app.fileType == AppFileType.APK) {
                     if (fileExists) {
+                        // Same version as the server is already installed, so installing again does nothing
+                        val isLatestInstalled = app.isLatestBuildInstalled
                         Button(
                             onClick = onInstallClick,
+                            enabled = !isLatestInstalled,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = GreenPrimary,
-                                contentColor = DarkBackground
+                                contentColor = DarkBackground,
+                                disabledContainerColor = DarkSurfaceElevated,
+                                disabledContentColor = TextMuted
                             )
                         ) {
-                            Icon(Icons.Default.Android, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(
+                                imageVector = if (isLatestInstalled) Icons.Default.Check else Icons.Default.Android,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Install APK", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = stringResource(if (isLatestInstalled) R.string.card_btn_installed else R.string.card_btn_install_apk),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
                         if (app.isInstalled) {

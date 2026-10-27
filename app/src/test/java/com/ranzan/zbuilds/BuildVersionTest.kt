@@ -1,10 +1,15 @@
 package com.ranzan.zbuilds
 
 import com.ranzan.zbuilds.core.utils.FormatHelper
+import com.ranzan.zbuilds.core.utils.downloadedBuildVersion
+import com.ranzan.zbuilds.core.utils.isLatestBuildInstalled
+import com.ranzan.zbuilds.core.utils.latestBuildVersion
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.TrackedApp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BuildVersionTest {
@@ -53,5 +58,20 @@ class BuildVersionTest {
         assertEquals("v3.0", app.latestBuildVersion)
         assertEquals("v2.0", app.downloadedBuildVersion)
         assertEquals("", app.copy(downloadedVersion = "").downloadedBuildVersion)
+    }
+
+    @Test
+    fun `latest build is installed only when installed version matches the server build`() {
+        val reddit = app(assetName = "reddit-morphe-v2026.24.0-all.apk")
+        assertTrue(reddit.copy(isInstalled = true, installedVersion = "2026.24.0").isLatestBuildInstalled)
+        assertFalse(reddit.copy(isInstalled = true, installedVersion = "2026.20.0").isLatestBuildInstalled)
+        assertFalse(reddit.copy(isInstalled = false, installedVersion = "2026.24.0").isLatestBuildInstalled)
+
+        val newerOnServer = reddit.copy(
+            isInstalled = true,
+            installedVersion = "2026.24.0",
+            latestAssetName = "reddit-morphe-v2026.30.0-all.apk"
+        )
+        assertFalse(newerOnServer.isLatestBuildInstalled)
     }
 }

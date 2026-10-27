@@ -2,8 +2,8 @@ package com.ranzan.zbuilds.ui.home
 
 import androidx.lifecycle.viewModelScope
 import com.ranzan.zbuilds.core.base.BaseViewModel
-import com.ranzan.zbuilds.core.utils.AssetMatcher
 import com.ranzan.zbuilds.core.utils.FormatHelper
+import com.ranzan.zbuilds.core.utils.latestBuildVersion
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
@@ -17,9 +17,9 @@ import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetTrackedAppsUseCase
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 class HomeViewModel(
     private val getTrackedAppsUseCase: GetTrackedAppsUseCase,
@@ -90,21 +90,21 @@ class HomeViewModel(
             is HomeUiAction.OnResume -> {
                 checkForUpdates(silent = true)
             }
-            is HomeUiAction.OnOpenAddSheet -> {
+            is HomeUiAction.OnOpenAddSource -> {
                 setState {
                     copy(
-                        isAddSheetOpen = true,
+                        isAddSourceOpen = true,
                         addSourceError = null,
                         fetchedRelease = null,
                         olderReleases = OlderReleasesState()
                     )
                 }
             }
-            is HomeUiAction.OnCloseAddSheet -> {
+            is HomeUiAction.OnCloseAddSource -> {
                 olderReleasesJob?.cancel()
                 setState {
                     copy(
-                        isAddSheetOpen = false,
+                        isAddSourceOpen = false,
                         addSourceUrl = "",
                         isFetchingSource = false,
                         fetchedRelease = null,
@@ -295,8 +295,7 @@ class HomeViewModel(
     }
 
     /**
-     * Loads older release pages and appends only files not already listed.
-     * Keeps paging (up to [MAX_PAGES_PER_LOAD]) until at least one new file is found.
+     * Loads older releases and appends only files that are not already listed.
      */
     private fun loadOlderReleases() {
         val latestRelease = currentState.fetchedRelease ?: return
@@ -307,41 +306,23 @@ class HomeViewModel(
         olderReleasesJob = viewModelScope.launch {
             setState { copy(olderReleases = olderReleases.copy(isLoading = true, message = null)) }
 
-            var page = older.lastLoadedPage
-            var hasMore = true
-            val knownPatterns = AssetMatcher.patternsOf(listOf(latestRelease) + older.releases).toMutableSet()
-            val newReleases = mutableListOf<SourceRelease>()
-            var error: String? = null
-
-            while (hasMore && newReleases.isEmpty() && page - older.lastLoadedPage < MAX_PAGES_PER_LOAD) {
-                val result = fetchSourceReleasesUseCase.fetchReleasePage(sourceUrl, page + 1, RELEASES_PER_PAGE)
-                if (result.isFailure) {
-                    error = result.exceptionOrNull()?.message ?: "Failed to load older releases"
-                    break
-                }
-                page++
-                val releases = result.getOrThrow()
-                hasMore = releases.size == RELEASES_PER_PAGE
-
-                val olderOnly = releases.filter { it.tag != latestRelease.tag }
-                val filtered = AssetMatcher.filterNewAssets(olderOnly, knownPatterns)
-                knownPatterns += AssetMatcher.patternsOf(filtered)
-                newReleases += filtered
-            }
+            val listedReleases = listOf(latestRelease) + older.releases
+            val result = fetchSourceReleasesUseCase.fetchOlderReleases(sourceUrl, listedReleases, older.lastLoadedPage)
+            val page = result.getOrNull()
 
             val message = when {
-                error != null -> error
-                newReleases.isNotEmpty() -> null
-                hasMore -> "No new files in the last ${page - older.lastLoadedPage} pages of older releases. Tap again to keep looking."
+                page == null -> result.exceptionOrNull()?.message ?: "Failed to load older releases"
+                page.releases.isNotEmpty() -> null
+                page.hasMore -> "No new files in the last ${page.pagesChecked} pages of older releases. Tap again to keep looking."
                 else -> "No other files found in older releases"
             }
 
             setState {
                 copy(
                     olderReleases = olderReleases.copy(
-                        releases = olderReleases.releases + newReleases,
-                        lastLoadedPage = page,
-                        hasMore = hasMore,
+                        releases = olderReleases.releases + page?.releases.orEmpty(),
+                        lastLoadedPage = page?.lastLoadedPage ?: olderReleases.lastLoadedPage,
+                        hasMore = page?.hasMore ?: olderReleases.hasMore,
                         isLoading = false,
                         message = message
                     )
@@ -399,7 +380,6 @@ class HomeViewModel(
             fileType = asset.fileType,
             arch = asset.arch,
             assetName = asset.name,
-            assetPattern = AssetMatcher.toPattern(asset.name, release.tag),
             latestVersion = release.tag,
             latestAssetName = asset.name,
             latestDownloadUrl = asset.downloadUrl,
@@ -416,10 +396,10 @@ class HomeViewModel(
             addTrackedAppUseCase(newApp)
 
             val msg = "Added $appName to tracked apps"
-            // Close sheet and give feedback
+            // Close Add App Source and give feedback
             setState {
                 copy(
-                    isAddSheetOpen = false,
+                    isAddSourceOpen = false,
                     addSourceUrl = "",
                     fetchedRelease = null,
                     statusMessage = msg
@@ -486,10 +466,5 @@ class HomeViewModel(
 
             matchesQuery && matchesFormat
         }
-    }
-
-    private companion object {
-        const val RELEASES_PER_PAGE = 10
-        const val MAX_PAGES_PER_LOAD = 3
     }
 }

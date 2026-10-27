@@ -1,4 +1,4 @@
-package com.ranzan.zbuilds.ui.components
+package com.ranzan.zbuilds.ui.addsource
 
 import android.content.ClipboardManager
 import android.content.Context
@@ -157,7 +157,7 @@ fun AddAppSourceScreen(
                 IconButton(onClick = navigateBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.add_source_back_desc),
                         tint = TextPrimary
                     )
                 }
@@ -346,7 +346,7 @@ fun AddAppSourceScreen(
                         if (olderAssets.isNotEmpty()) {
                             item(key = "header/${release.tag}") {
                                 Text(
-                                    text = "Older release: ${release.tag}",
+                                    text = stringResource(R.string.add_source_older_release_title, release.tag),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TextSecondary,
@@ -519,11 +519,11 @@ private fun LoadOlderFooter(
                         color = GreenPrimary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Loading older releases...", fontSize = 13.sp, color = TextSecondary)
+                    Text(stringResource(R.string.add_source_loading_older), fontSize = 13.sp, color = TextSecondary)
                 } else {
                     Icon(Icons.Default.History, contentDescription = null, tint = GreenPrimary, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Load older releases", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = GreenPrimary)
+                    Text(stringResource(R.string.add_source_btn_load_older), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = GreenPrimary)
                 }
             }
         }

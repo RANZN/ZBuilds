@@ -2,9 +2,11 @@ package com.ranzan.zbuilds.data.repository
 
 import com.ranzan.zbuilds.core.utils.AssetMatcher
 import com.ranzan.zbuilds.core.utils.FormatHelper
+import com.ranzan.zbuilds.core.utils.downloadedBuildVersion
 import com.ranzan.zbuilds.data.local.TrackedAppsDataStore
 import com.ranzan.zbuilds.data.remote.GitHubApiService
 import com.ranzan.zbuilds.data.remote.SourceUrlParser
+import com.ranzan.zbuilds.domain.model.OlderReleasesPage
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
 import com.ranzan.zbuilds.domain.model.TrackedApp
@@ -34,7 +36,9 @@ class AppRepositoryImpl(
 
         val enrichedApp = app.copy(
             isInstalled = isInstalled,
-            installedVersion = installedVersion
+            installedVersion = installedVersion,
+            // Version-independent file name pattern used to find this file in future releases
+            assetPattern = app.assetPattern.ifBlank { AssetMatcher.toPattern(app.assetName, app.latestVersion) }
         )
         trackedAppsDataStore.addTrackedApp(enrichedApp)
     }
@@ -51,8 +55,40 @@ class AppRepositoryImpl(
         return gitHubApiService.fetchReleases(sourceUrl)
     }
 
-    override suspend fun fetchReleasePage(sourceUrl: String, page: Int, perPage: Int): Result<List<SourceRelease>> {
-        return gitHubApiService.fetchReleasePage(sourceUrl, page, perPage)
+    /**
+     * Pages through older releases and keeps only files not already in [listedReleases].
+     * Checks up to [MAX_PAGES_PER_LOAD] pages so one call stops once something new is found.
+     */
+    override suspend fun fetchOlderReleases(
+        sourceUrl: String,
+        listedReleases: List<SourceRelease>,
+        afterPage: Int
+    ): Result<OlderReleasesPage> {
+        val listedTags = listedReleases.map { it.tag }.toSet()
+        val knownPatterns = AssetMatcher.patternsOf(listedReleases).toMutableSet()
+        val newReleases = mutableListOf<SourceRelease>()
+        var page = afterPage
+        var hasMore = true
+
+        while (hasMore && newReleases.isEmpty() && page - afterPage < MAX_PAGES_PER_LOAD) {
+            val result = gitHubApiService.fetchReleasePage(sourceUrl, page + 1, RELEASES_PER_PAGE)
+            val releases = result.getOrElse { return Result.failure(it) }
+            page++
+            hasMore = releases.size == RELEASES_PER_PAGE
+
+            val filtered = AssetMatcher.filterNewAssets(releases.filter { it.tag !in listedTags }, knownPatterns)
+            knownPatterns += AssetMatcher.patternsOf(filtered)
+            newReleases += filtered
+        }
+
+        return Result.success(
+            OlderReleasesPage(
+                releases = newReleases,
+                lastLoadedPage = page,
+                pagesChecked = page - afterPage,
+                hasMore = hasMore
+            )
+        )
     }
 
     override suspend fun checkForUpdates(): Result<List<TrackedApp>> {
@@ -166,4 +202,9 @@ class AppRepositoryImpl(
             arch = app.arch,
             assets = release.assets
         )
+
+    private companion object {
+        const val RELEASES_PER_PAGE = 10
+        const val MAX_PAGES_PER_LOAD = 3
+    }
 }

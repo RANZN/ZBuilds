@@ -56,7 +56,7 @@ import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
-import com.ranzan.zbuilds.ui.components.AddAppSourceScreen
+import com.ranzan.zbuilds.ui.addsource.AddAppSourceScreen
 import com.ranzan.zbuilds.ui.components.TopSearchBar
 import com.ranzan.zbuilds.ui.components.TrackedAppCard
 import com.ranzan.zbuilds.ui.components.UpdateBannerCard
@@ -104,7 +104,7 @@ fun HomeScreenHost(
     // Kept here so the home list keeps its scroll position while Add App Source is open
     val listState = rememberLazyListState()
 
-    if (state.isAddSheetOpen) {
+    if (state.isAddSourceOpen) {
         AddAppSourceScreen(
             sourceUrl = state.addSourceUrl,
             isFetching = state.isFetchingSource,
@@ -123,7 +123,7 @@ fun HomeScreenHost(
             onSelectAsset = { asset, release ->
                 viewModel.onAction(HomeUiAction.OnSelectAssetToTrack(asset, release))
             },
-            onNavigateBack = { viewModel.onAction(HomeUiAction.OnCloseAddSheet) }
+            onNavigateBack = { viewModel.onAction(HomeUiAction.OnCloseAddSource) }
         )
     } else {
         HomeScreen(
@@ -170,7 +170,7 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { handleAction(HomeUiAction.OnOpenAddSheet) },
+                onClick = { handleAction(HomeUiAction.OnOpenAddSource) },
                 icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_action_add_desc)) },
                 text = { Text(stringResource(R.string.home_btn_add), fontWeight = FontWeight.Bold, fontSize = 14.sp) },
                 containerColor = GreenPrimary,

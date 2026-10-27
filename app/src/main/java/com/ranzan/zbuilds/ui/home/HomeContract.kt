@@ -19,8 +19,8 @@ data class HomeUiState(
     val downloadProgressMap: Map<String, DownloadProgress> = emptyMap(),
     // Suggestions from repository / Remote Config
     val suggestions: List<SourceSuggestion> = emptyList(),
-    // Add App Sheet State
-    val isAddSheetOpen: Boolean = false,
+    // Add App Source screen state
+    val isAddSourceOpen: Boolean = false,
     val addSourceUrl: String = "",
     val isFetchingSource: Boolean = false,
     val fetchedRelease: SourceRelease? = null,
@@ -48,8 +48,8 @@ data class OlderReleasesState(
 sealed interface HomeUiAction : UiAction {
     data class OnSearchQueryChange(val query: String) : HomeUiAction
     data object OnRefresh : HomeUiAction
-    data object OnOpenAddSheet : HomeUiAction
-    data object OnCloseAddSheet : HomeUiAction
+    data object OnOpenAddSource : HomeUiAction
+    data object OnCloseAddSource : HomeUiAction
     data class OnSourceUrlChange(val url: String) : HomeUiAction
     data object OnFetchSourceReleases : HomeUiAction
     data object OnLoadOlderReleases : HomeUiAction

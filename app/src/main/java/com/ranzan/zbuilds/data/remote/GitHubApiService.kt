@@ -35,6 +35,22 @@ class GitHubApiService(
         }
     }
 
+    /**
+     * Builds a GET request for the GitHub API, adding the token when one is set.
+     */
+    private fun gitHubRequest(url: String, token: String?): Request {
+        val builder = Request.Builder()
+            .url(url)
+            .header("Accept", "application/vnd.github.v3+json")
+            .header("User-Agent", "ZBuilds-Android-App")
+            .get()
+
+        if (!token.isNullOrBlank()) {
+            builder.header("Authorization", "Bearer $token")
+        }
+        return builder.build()
+    }
+
     suspend fun fetchReleases(sourceUrl: String): Result<SourceRelease> = withContext(Dispatchers.IO) {
         try {
             val repoPair = SourceUrlParser.parseGitHubRepo(sourceUrl)
@@ -44,31 +60,15 @@ class GitHubApiService(
             val apiUrl = SourceUrlParser.toReleasesApiUrl(owner, repo)
             val token = getAuthToken()
 
-            val requestBuilder = Request.Builder()
-                .url(apiUrl)
-                .header("Accept", "application/vnd.github.v3+json")
-                .header("User-Agent", "ZBuilds-Android-App")
-                .get()
+            val request = gitHubRequest(apiUrl, token)
 
-            if (!token.isNullOrBlank()) {
-                requestBuilder.header("Authorization", "Bearer $token")
-            }
-
-            val response = client.newCall(requestBuilder.build()).execute()
+            val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
                 // If /releases returned error or empty, try /releases/latest
                 val latestUrl = SourceUrlParser.toLatestReleaseApiUrl(owner, repo)
-                val fallbackBuilder = Request.Builder()
-                    .url(latestUrl)
-                    .header("Accept", "application/vnd.github.v3+json")
-                    .header("User-Agent", "ZBuilds-Android-App")
-                    .get()
+                val fallbackRequest = gitHubRequest(latestUrl, token)
 
-                if (!token.isNullOrBlank()) {
-                    fallbackBuilder.header("Authorization", "Bearer $token")
-                }
-
-                val fallbackResponse = client.newCall(fallbackBuilder.build()).execute()
+                val fallbackResponse = client.newCall(fallbackRequest).execute()
                 if (!fallbackResponse.isSuccessful) {
                     return@withContext Result.failure(
                         IOException("GitHub API returned error code ${response.code}: ${response.message}")
@@ -115,17 +115,9 @@ class GitHubApiService(
             val apiUrl = "${SourceUrlParser.toReleasesApiUrl(owner, repo)}?per_page=$perPage&page=$page"
             val token = getAuthToken()
 
-            val requestBuilder = Request.Builder()
-                .url(apiUrl)
-                .header("Accept", "application/vnd.github.v3+json")
-                .header("User-Agent", "ZBuilds-Android-App")
-                .get()
+            val request = gitHubRequest(apiUrl, token)
 
-            if (!token.isNullOrBlank()) {
-                requestBuilder.header("Authorization", "Bearer $token")
-            }
-
-            val response = client.newCall(requestBuilder.build()).execute()
+            val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
                 return@withContext Result.failure(
                     IOException("GitHub API returned error code ${response.code}: ${response.message}")
@@ -145,17 +137,9 @@ class GitHubApiService(
             val apiUrl = SourceUrlParser.toReleasesApiUrl(owner, repo)
             val token = getAuthToken()
 
-            val requestBuilder = Request.Builder()
-                .url(apiUrl)
-                .header("Accept", "application/vnd.github.v3+json")
-                .header("User-Agent", "ZBuilds-Android-App")
-                .get()
+            val request = gitHubRequest(apiUrl, token)
 
-            if (!token.isNullOrBlank()) {
-                requestBuilder.header("Authorization", "Bearer $token")
-            }
-
-            val response = client.newCall(requestBuilder.build()).execute()
+            val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
                 return@withContext Result.failure(IOException("Failed to fetch release: ${response.code}"))
             }
@@ -178,13 +162,7 @@ class GitHubApiService(
 
     suspend fun validateToken(token: String): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
-                .url("https://api.github.com/user")
-                .header("Accept", "application/vnd.github.v3+json")
-                .header("User-Agent", "ZBuilds-Android-App")
-                .header("Authorization", "Bearer ${token.trim()}")
-                .get()
-                .build()
+            val request = gitHubRequest("https://api.github.com/user", token.trim())
 
             val response = client.newCall(request).execute()
             val remaining = response.header("x-ratelimit-remaining")
