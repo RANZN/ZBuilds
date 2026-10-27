@@ -70,7 +70,8 @@ class AppDownloader(
             }
 
             // Clean sanitized file name
-            val fileName = app.assetName.ifBlank {
+            // Save under the latest build's file name so each version keeps its own file
+            val fileName = app.latestAssetName.ifBlank { app.assetName }.ifBlank {
                 val ext = if (app.fileType == AppFileType.APK) ".apk" else ".zip"
                 "${app.name.replace(" ", "_")}_${app.latestVersion}$ext"
             }
@@ -163,6 +164,7 @@ class AppDownloader(
 
             val updatedApp = app.copy(
                 downloadedVersion = app.latestVersion,
+                assetName = app.latestAssetName.ifBlank { app.assetName },
                 localFilePath = destinationFile.absolutePath,
                 packageName = updatedPackageName,
                 isInstalled = isInstalled,

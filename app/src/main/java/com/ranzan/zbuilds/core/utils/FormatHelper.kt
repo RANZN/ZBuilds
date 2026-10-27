@@ -24,6 +24,15 @@ object FormatHelper {
         return version.trim().removePrefix("v").removePrefix("V")
     }
 
+    private val assetVersionRegex = Regex("""(?<![a-z0-9])v?(\d+(?:\.\d+)+)""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Extracts the build version from an asset file name or tag,
+     * e.g. "reddit-morphe-v2026.24.0-all.apk" -> "2026.24.0". Returns null if none is present.
+     */
+    fun versionFromAssetName(name: String): String? =
+        assetVersionRegex.find(name)?.groupValues?.get(1)
+
     /**
      * Determines a clean display name from an APK or ZIP filename
      */

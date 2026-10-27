@@ -225,7 +225,7 @@ class HomeViewModel(
             val message = if (result.isSuccess) {
                 val updatedApp = result.getOrThrow()
                 if (updatedApp.hasUpdate) {
-                    "Update available for ${updatedApp.name} (${updatedApp.latestVersion})"
+                    "Update available for ${updatedApp.name} (${updatedApp.latestBuildVersion})"
                 } else {
                     "${updatedApp.name} is up to date"
                 }
@@ -401,6 +401,7 @@ class HomeViewModel(
             assetName = asset.name,
             assetPattern = AssetMatcher.toPattern(asset.name, release.tag),
             latestVersion = release.tag,
+            latestAssetName = asset.name,
             latestDownloadUrl = asset.downloadUrl,
             latestSizeBytes = asset.sizeBytes,
             downloadedVersion = "",
@@ -450,7 +451,7 @@ class HomeViewModel(
             progressJob.cancel()
 
             val msg = if (result.isSuccess) {
-                "Downloaded ${app.name} (${app.latestVersion})"
+                "Downloaded ${app.name} (${app.latestBuildVersion})"
             } else {
                 "Download failed: ${result.exceptionOrNull()?.message}"
             }
@@ -475,7 +476,8 @@ class HomeViewModel(
             val matchesQuery = query.isBlank() ||
                     app.name.contains(query, ignoreCase = true) ||
                     app.assetName.contains(query, ignoreCase = true) ||
-                    app.latestVersion.contains(query, ignoreCase = true)
+                    app.latestVersion.contains(query, ignoreCase = true) ||
+                    app.latestBuildVersion.contains(query, ignoreCase = true)
 
             val matchesFormat = when (app.fileType) {
                 AppFileType.APK -> showApks

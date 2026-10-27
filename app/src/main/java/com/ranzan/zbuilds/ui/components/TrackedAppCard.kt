@@ -181,7 +181,7 @@ fun TrackedAppCard(
                     Spacer(modifier = Modifier.height(2.dp))
 
                     Text(
-                        text = "Version: ${app.latestVersion} • ${FormatHelper.formatBytes(app.latestSizeBytes)}",
+                        text = "Version: ${app.latestBuildVersion} • ${FormatHelper.formatBytes(app.latestSizeBytes)}",
                         fontSize = 12.sp,
                         color = TextSecondary
                     )
@@ -318,9 +318,9 @@ fun TrackedAppCard(
                                 .background(AccentOrange, CircleShape)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        val currentVer = app.installedVersion ?: app.downloadedVersion
+                        val currentVer = app.installedVersion ?: app.downloadedBuildVersion
                         Text(
-                            text = "Update Available: current $currentVer → latest ${app.latestVersion}",
+                            text = "Update Available: current $currentVer → latest ${app.latestBuildVersion}",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = AccentOrange
@@ -343,7 +343,7 @@ fun TrackedAppCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Up to date (${app.downloadedVersion})",
+                            text = "Up to date (${app.installedVersion ?: app.downloadedBuildVersion.ifBlank { app.latestBuildVersion }})",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = TextSecondary
