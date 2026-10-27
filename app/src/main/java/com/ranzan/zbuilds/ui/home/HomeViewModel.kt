@@ -4,13 +4,12 @@ import androidx.lifecycle.viewModelScope
 import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.core.base.BaseViewModel
 import com.ranzan.zbuilds.core.base.UiText
-import com.ranzan.zbuilds.core.utils.FormatHelper
-import com.ranzan.zbuilds.core.utils.latestBuildVersion
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
 import com.ranzan.zbuilds.domain.model.TrackedApp
+import com.ranzan.zbuilds.domain.rules.latestBuildVersion
 import com.ranzan.zbuilds.domain.usecase.AddTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.CheckAppUpdatesUseCase
 import com.ranzan.zbuilds.domain.usecase.DeleteTrackedAppUseCase
@@ -87,7 +86,7 @@ class HomeViewModel(
             is HomeUiAction.OnRefresh -> {
                 checkForUpdates(silent = false)
             }
-            is HomeUiAction.OnCheckAllUpdates, is HomeUiAction.OnUpdateAll -> {
+            is HomeUiAction.OnUpdateAll -> {
                 downloadAllAvailableUpdates()
             }
             is HomeUiAction.OnResume -> {
@@ -124,6 +123,9 @@ class HomeViewModel(
                     )
                 }
             }
+            is HomeUiAction.OnPasteSourceUrlClick -> {
+                sendEffect(HomeUiEffect.RequestPasteSourceUrl)
+            }
             is HomeUiAction.OnFetchSourceReleases -> {
                 fetchSourceReleases()
             }
@@ -148,12 +150,8 @@ class HomeViewModel(
                 viewModelScope.launch {
                     deleteTrackedAppUseCase(action.appId)
                     val msg = UiText.res(R.string.home_msg_app_removed)
-                    setState { copy(statusMessage = msg) }
                     sendEffect(HomeUiEffect.ShowSnackbar(msg))
                 }
-            }
-            is HomeUiAction.OnClearStatusMessage -> {
-                setState { copy(statusMessage = null) }
             }
             is HomeUiAction.OnSettingsClick -> {
                 sendEffect(HomeUiEffect.NavigateToSettings)
@@ -178,7 +176,7 @@ class HomeViewModel(
     private fun checkForUpdates(silent: Boolean) {
         viewModelScope.launch {
             if (!silent) {
-                setState { copy(isRefreshing = true, statusMessage = UiText.res(R.string.home_msg_checking)) }
+                setState { copy(isRefreshing = true) }
             }
 
             val result = checkAppUpdatesUseCase()
@@ -193,23 +191,13 @@ class HomeViewModel(
                     null
                 }
 
-                setState {
-                    copy(
-                        isRefreshing = false,
-                        statusMessage = message
-                    )
-                }
+                setState { copy(isRefreshing = false) }
                 if (message != null && !silent) {
                     sendEffect(HomeUiEffect.ShowSnackbar(message))
                 }
             } else {
                 val errorMsg = if (!silent) UiText.res(R.string.home_msg_check_failed, result.exceptionOrNull().toUiText()) else null
-                setState {
-                    copy(
-                        isRefreshing = false,
-                        statusMessage = errorMsg
-                    )
-                }
+                setState { copy(isRefreshing = false) }
                 if (errorMsg != null) {
                     sendEffect(HomeUiEffect.ShowSnackbar(errorMsg))
                 }
@@ -222,7 +210,7 @@ class HomeViewModel(
      */
     private fun checkSingleAppUpdate(app: TrackedApp) {
         viewModelScope.launch {
-            setState { copy(isRefreshing = true, statusMessage = UiText.res(R.string.home_msg_checking_app, app.name)) }
+            setState { copy(isRefreshing = true) }
 
             val result = checkAppUpdatesUseCase.checkSingleApp(app)
             val message = if (result.isSuccess) {
@@ -236,7 +224,7 @@ class HomeViewModel(
                 UiText.res(R.string.home_msg_check_failed, result.exceptionOrNull().toUiText())
             }
 
-            setState { copy(isRefreshing = false, statusMessage = message) }
+            setState { copy(isRefreshing = false) }
             sendEffect(HomeUiEffect.ShowSnackbar(message))
         }
     }
@@ -245,7 +233,6 @@ class HomeViewModel(
         val appsToUpdate = currentState.trackedApps.filter { it.hasUpdate }
         if (appsToUpdate.isNotEmpty()) {
             val msg = UiText.plural(R.plurals.home_msg_starting_downloads, appsToUpdate.size, appsToUpdate.size)
-            setState { copy(statusMessage = msg) }
             sendEffect(HomeUiEffect.ShowSnackbar(msg))
             appsToUpdate.forEach { app ->
                 if (currentState.downloadProgressMap[app.id] !is DownloadProgress.Downloading) {
@@ -254,19 +241,14 @@ class HomeViewModel(
             }
         } else {
             viewModelScope.launch {
-                setState { copy(isRefreshing = true, statusMessage = UiText.res(R.string.home_msg_checking_updates)) }
+                setState { copy(isRefreshing = true) }
                 val result = checkAppUpdatesUseCase()
                 if (result.isSuccess) {
                     val updatedApps = result.getOrNull().orEmpty()
                     val newUpdates = updatedApps.filter { it.hasUpdate }
                     if (newUpdates.isNotEmpty()) {
                         val msg = UiText.plural(R.plurals.home_msg_found_updates, newUpdates.size, newUpdates.size)
-                        setState {
-                            copy(
-                                isRefreshing = false,
-                                statusMessage = msg
-                            )
-                        }
+                        setState { copy(isRefreshing = false) }
                         sendEffect(HomeUiEffect.ShowSnackbar(msg))
                         newUpdates.forEach { app ->
                             if (currentState.downloadProgressMap[app.id] !is DownloadProgress.Downloading) {
@@ -275,22 +257,12 @@ class HomeViewModel(
                         }
                     } else {
                         val msg = UiText.res(R.string.home_msg_all_up_to_date)
-                        setState {
-                            copy(
-                                isRefreshing = false,
-                                statusMessage = msg
-                            )
-                        }
+                        setState { copy(isRefreshing = false) }
                         sendEffect(HomeUiEffect.ShowSnackbar(msg))
                     }
                 } else {
                     val errorMsg = UiText.res(R.string.home_msg_check_failed, result.exceptionOrNull().toUiText())
-                    setState {
-                        copy(
-                            isRefreshing = false,
-                            statusMessage = errorMsg
-                        )
-                    }
+                    setState { copy(isRefreshing = false) }
                     sendEffect(HomeUiEffect.ShowSnackbar(errorMsg))
                 }
             }
@@ -373,7 +345,7 @@ class HomeViewModel(
         customName: String?
     ) {
         val appName = customName?.ifBlank { null }
-            ?: FormatHelper.deriveAppNameFromAsset(asset.name)
+            ?: asset.appName
 
         val newApp = TrackedApp(
             id = UUID.randomUUID().toString(),
@@ -404,8 +376,7 @@ class HomeViewModel(
                 copy(
                     isAddSourceOpen = false,
                     addSourceUrl = "",
-                    fetchedRelease = null,
-                    statusMessage = msg
+                    fetchedRelease = null
                 )
             }
             sendEffect(HomeUiEffect.ShowSnackbar(msg))
@@ -420,11 +391,7 @@ class HomeViewModel(
             // Observe progress flow
             val progressJob = launch {
                 downloadAppUseCase.observeProgress(app.id).collect { progress ->
-                    setState {
-                        copy(
-                            downloadProgressMap = downloadProgressMap + (app.id to progress)
-                        )
-                    }
+                    setState { copy(downloadProgressMap = downloadProgressMap + (app.id to progress)) }
                 }
             }
 
@@ -439,12 +406,7 @@ class HomeViewModel(
                 UiText.res(R.string.home_msg_download_failed, result.exceptionOrNull().toUiText())
             }
 
-            setState {
-                copy(
-                    downloadProgressMap = downloadProgressMap - app.id,
-                    statusMessage = msg
-                )
-            }
+            setState { copy(downloadProgressMap = downloadProgressMap - app.id) }
             sendEffect(HomeUiEffect.ShowSnackbar(msg))
         }
     }

@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.ranzan.zbuilds.data.local.model.TrackedAppEntity
+import com.ranzan.zbuilds.data.local.model.toDomain
+import com.ranzan.zbuilds.data.local.model.toEntity
 import com.ranzan.zbuilds.domain.model.TrackedApp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -24,6 +27,13 @@ class TrackedAppsDataStore(
 
     private val KEY_TRACKED_APPS = stringPreferencesKey("key_tracked_apps_json")
 
+    // Stored as TrackedAppEntity JSON; callers only see domain TrackedApp
+    private fun decode(jsonString: String): List<TrackedApp> =
+        json.decodeFromString<List<TrackedAppEntity>>(jsonString).map { it.toDomain() }
+
+    private fun encode(apps: List<TrackedApp>): String =
+        json.encodeToString(apps.map { it.toEntity() })
+
     fun getTrackedApps(): Flow<List<TrackedApp>> {
         return context.trackedAppsDataStore.data.map { preferences ->
             val jsonString = preferences[KEY_TRACKED_APPS]
@@ -31,7 +41,7 @@ class TrackedAppsDataStore(
                 emptyList()
             } else {
                 try {
-                    json.decodeFromString<List<TrackedApp>>(jsonString)
+                    decode(jsonString)
                 } catch (e: Exception) {
                     emptyList()
                 }
@@ -41,7 +51,7 @@ class TrackedAppsDataStore(
 
     suspend fun saveTrackedApps(apps: List<TrackedApp>) {
         context.trackedAppsDataStore.edit { preferences ->
-            val jsonString = json.encodeToString(apps)
+            val jsonString = encode(apps)
             preferences[KEY_TRACKED_APPS] = jsonString
         }
     }
@@ -53,7 +63,7 @@ class TrackedAppsDataStore(
                 mutableListOf()
             } else {
                 try {
-                    json.decodeFromString<List<TrackedApp>>(jsonString).toMutableList()
+                    decode(jsonString).toMutableList()
                 } catch (e: Exception) {
                     mutableListOf()
                 }
@@ -63,7 +73,7 @@ class TrackedAppsDataStore(
             currentList.removeAll { it.id == app.id || (it.sourceUrl == app.sourceUrl && it.assetName == app.assetName) }
             currentList.add(0, app) // Add to top
 
-            preferences[KEY_TRACKED_APPS] = json.encodeToString(currentList.toList())
+            preferences[KEY_TRACKED_APPS] = encode(currentList)
         }
     }
 
@@ -71,7 +81,7 @@ class TrackedAppsDataStore(
         context.trackedAppsDataStore.edit { preferences ->
             val jsonString = preferences[KEY_TRACKED_APPS] ?: return@edit
             val currentList = try {
-                json.decodeFromString<List<TrackedApp>>(jsonString).toMutableList()
+                decode(jsonString).toMutableList()
             } catch (e: Exception) {
                 return@edit
             }
@@ -79,7 +89,7 @@ class TrackedAppsDataStore(
             val index = currentList.indexOfFirst { it.id == app.id }
             if (index != -1) {
                 currentList[index] = app
-                preferences[KEY_TRACKED_APPS] = json.encodeToString(currentList.toList())
+                preferences[KEY_TRACKED_APPS] = encode(currentList)
             }
         }
     }
@@ -88,13 +98,13 @@ class TrackedAppsDataStore(
         context.trackedAppsDataStore.edit { preferences ->
             val jsonString = preferences[KEY_TRACKED_APPS] ?: return@edit
             val currentList = try {
-                json.decodeFromString<List<TrackedApp>>(jsonString).toMutableList()
+                decode(jsonString).toMutableList()
             } catch (e: Exception) {
                 return@edit
             }
 
             currentList.removeAll { it.id == id }
-            preferences[KEY_TRACKED_APPS] = json.encodeToString(currentList.toList())
+            preferences[KEY_TRACKED_APPS] = encode(currentList)
         }
     }
 }

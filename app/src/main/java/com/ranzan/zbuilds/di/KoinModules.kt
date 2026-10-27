@@ -28,6 +28,7 @@ import com.ranzan.zbuilds.domain.usecase.ClearDownloadCacheUseCase
 import com.ranzan.zbuilds.domain.usecase.DeleteTrackedAppUseCase
 import com.ranzan.zbuilds.domain.usecase.DownloadAppUseCase
 import com.ranzan.zbuilds.domain.usecase.FetchSourceReleasesUseCase
+import com.ranzan.zbuilds.domain.usecase.GetAppVersionUseCase
 import com.ranzan.zbuilds.domain.usecase.GetCrashReportsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSettingsUseCase
 import com.ranzan.zbuilds.domain.usecase.GetSourceSuggestionsUseCase
@@ -78,6 +79,7 @@ val useCaseModule = module {
     factoryOf(::TrackCrashUseCase)
     factoryOf(::GetCrashReportsUseCase)
     factoryOf(::ClearCrashReportsUseCase)
+    factoryOf(::GetAppVersionUseCase)
 }
 
 val viewModelModule = module {

@@ -1,12 +1,9 @@
 package com.ranzan.zbuilds.data.remote
 
-import com.ranzan.zbuilds.core.utils.ArchitectureHelper
 import com.ranzan.zbuilds.data.local.SettingsDataStore
 import com.ranzan.zbuilds.data.remote.model.GitHubReleaseDto
+import com.ranzan.zbuilds.data.remote.model.GitHubTokenCheckDto
 import com.ranzan.zbuilds.domain.model.AppError
-import com.ranzan.zbuilds.domain.model.GithubTokenStatus
-import com.ranzan.zbuilds.domain.model.ReleaseAsset
-import com.ranzan.zbuilds.domain.model.SourceRelease
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,6 +12,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
+/**
+ * GitHub REST API client. Returns network DTOs only; repositories convert them to domain models.
+ */
 class GitHubApiService(
     private val settingsDataStore: SettingsDataStore? = null
 ) {
@@ -52,116 +52,61 @@ class GitHubApiService(
         return builder.build()
     }
 
-    suspend fun fetchReleases(sourceUrl: String): Result<SourceRelease> = withContext(Dispatchers.IO) {
+    /**
+     * Fetches the repository's releases (newest first). Falls back to the latest release
+     * endpoint when the list endpoint fails.
+     */
+    suspend fun fetchReleases(sourceUrl: String): Result<List<GitHubReleaseDto>> = withContext(Dispatchers.IO) {
         try {
-            val repoPair = SourceUrlParser.parseGitHubRepo(sourceUrl)
+            val (owner, repo) = SourceUrlParser.parseGitHubRepo(sourceUrl)
                 ?: return@withContext Result.failure(AppError.InvalidSourceUrl())
-
-            val (owner, repo) = repoPair
-            val apiUrl = SourceUrlParser.toReleasesApiUrl(owner, repo)
             val token = getAuthToken()
 
-            val request = gitHubRequest(apiUrl, token)
-
-            val response = client.newCall(request).execute()
+            val response = client.newCall(gitHubRequest(SourceUrlParser.toReleasesApiUrl(owner, repo), token)).execute()
             if (!response.isSuccessful) {
-                // If /releases returned error or empty, try /releases/latest
-                val latestUrl = SourceUrlParser.toLatestReleaseApiUrl(owner, repo)
-                val fallbackRequest = gitHubRequest(latestUrl, token)
-
-                val fallbackResponse = client.newCall(fallbackRequest).execute()
+                val fallbackResponse = client.newCall(
+                    gitHubRequest(SourceUrlParser.toLatestReleaseApiUrl(owner, repo), token)
+                ).execute()
                 if (!fallbackResponse.isSuccessful) {
-                    return@withContext Result.failure(
-                        AppError.Http(response.code)
-                    )
+                    return@withContext Result.failure(AppError.Http(response.code))
                 }
-
                 val body = fallbackResponse.body?.string().orEmpty()
-                val singleRelease = json.decodeFromString<GitHubReleaseDto>(body)
-                return@withContext Result.success(mapToSourceRelease(singleRelease))
+                return@withContext Result.success(listOf(json.decodeFromString<GitHubReleaseDto>(body)))
             }
 
-            val responseBody = response.body?.string().orEmpty()
-            val releases = json.decodeFromString<List<GitHubReleaseDto>>(responseBody)
-            if (releases.isEmpty()) {
-                return@withContext Result.failure(AppError.NoReleases())
-            }
-
-            // Find the first release that has APK or ZIP assets
-            val activeRelease = releases.firstOrNull { release ->
-                release.assets.any { asset ->
-                    ArchitectureHelper.detectFileType(asset.name) != null
-                }
-            } ?: releases.first()
-
-            Result.success(mapToSourceRelease(activeRelease))
+            val body = response.body?.string().orEmpty()
+            Result.success(json.decodeFromString<List<GitHubReleaseDto>>(body))
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     /**
-     * Fetches one page of releases (newest first), keeping only APK/ZIP assets.
-     * Used to load older releases on demand.
+     * Fetches one page of releases (newest first). Used to load older releases on demand.
      */
     suspend fun fetchReleasePage(
         sourceUrl: String,
         page: Int,
         perPage: Int
-    ): Result<List<SourceRelease>> = withContext(Dispatchers.IO) {
+    ): Result<List<GitHubReleaseDto>> = withContext(Dispatchers.IO) {
         try {
             val (owner, repo) = SourceUrlParser.parseGitHubRepo(sourceUrl)
                 ?: return@withContext Result.failure(AppError.InvalidSourceUrl())
 
             val apiUrl = "${SourceUrlParser.toReleasesApiUrl(owner, repo)}?per_page=$perPage&page=$page"
-            val token = getAuthToken()
-
-            val request = gitHubRequest(apiUrl, token)
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(
-                    AppError.Http(response.code)
-                )
-            }
-
-            val body = response.body?.string().orEmpty()
-            val releases = json.decodeFromString<List<GitHubReleaseDto>>(body)
-            Result.success(releases.map { mapToSourceRelease(it) })
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun fetchLatestRelease(owner: String, repo: String): Result<SourceRelease> = withContext(Dispatchers.IO) {
-        try {
-            val apiUrl = SourceUrlParser.toReleasesApiUrl(owner, repo)
-            val token = getAuthToken()
-
-            val request = gitHubRequest(apiUrl, token)
-
-            val response = client.newCall(request).execute()
+            val response = client.newCall(gitHubRequest(apiUrl, getAuthToken())).execute()
             if (!response.isSuccessful) {
                 return@withContext Result.failure(AppError.Http(response.code))
             }
 
             val body = response.body?.string().orEmpty()
-            val releases = json.decodeFromString<List<GitHubReleaseDto>>(body)
-            if (releases.isEmpty()) {
-                return@withContext Result.failure(AppError.NoReleases())
-            }
-
-            val latest = releases.firstOrNull { r ->
-                r.assets.any { ArchitectureHelper.detectFileType(it.name) != null }
-            } ?: releases.first()
-
-            Result.success(mapToSourceRelease(latest))
+            Result.success(json.decodeFromString<List<GitHubReleaseDto>>(body))
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    suspend fun validateToken(token: String): Result<GithubTokenStatus> = withContext(Dispatchers.IO) {
+    suspend fun validateToken(token: String): Result<GitHubTokenCheckDto> = withContext(Dispatchers.IO) {
         try {
             val request = gitHubRequest("https://api.github.com/user", token.trim())
 
@@ -171,12 +116,11 @@ class GitHubApiService(
 
             if (response.isSuccessful) {
                 val body = response.body?.string().orEmpty()
-                val jsonBody = JSONObject(body)
                 Result.success(
-                    GithubTokenStatus(
-                        login = jsonBody.optString("login").ifBlank { null },
-                        remainingRequests = remaining,
-                        requestLimit = limit
+                    GitHubTokenCheckDto(
+                        login = JSONObject(body).optString("login").ifBlank { null },
+                        rateLimitRemaining = remaining,
+                        rateLimit = limit
                     )
                 )
             } else if (response.code == 401 || response.code == 403) {
@@ -187,31 +131,5 @@ class GitHubApiService(
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    private fun mapToSourceRelease(dto: GitHubReleaseDto): SourceRelease {
-        val assets = dto.assets.mapNotNull { asset ->
-            val fileType = ArchitectureHelper.detectFileType(asset.name)
-            if (fileType != null) {
-                ReleaseAsset(
-                    name = asset.name,
-                    downloadUrl = asset.browserDownloadUrl,
-                    sizeBytes = asset.size,
-                    fileType = fileType,
-                    arch = ArchitectureHelper.detectArchitecture(asset.name),
-                    releaseTag = dto.tagName
-                )
-            } else {
-                null
-            }
-        }
-
-        return SourceRelease(
-            tag = dto.tagName,
-            title = dto.name ?: dto.tagName,
-            publishedAt = dto.publishedAt.orEmpty(),
-            body = dto.body.orEmpty(),
-            assets = assets
-        )
     }
 }

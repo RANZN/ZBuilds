@@ -1,19 +1,24 @@
 package com.ranzan.zbuilds.data.repository
 
-import com.ranzan.zbuilds.core.utils.AssetMatcher
-import com.ranzan.zbuilds.core.utils.FormatHelper
-import com.ranzan.zbuilds.core.utils.downloadedBuildVersion
 import com.ranzan.zbuilds.data.local.TrackedAppsDataStore
 import com.ranzan.zbuilds.data.remote.GitHubApiService
-import com.ranzan.zbuilds.data.remote.SourceUrlParser
+import com.ranzan.zbuilds.data.remote.mapper.toDomain
+import com.ranzan.zbuilds.domain.model.AppError
 import com.ranzan.zbuilds.domain.model.OlderReleasesPage
 import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
 import com.ranzan.zbuilds.domain.model.TrackedApp
 import com.ranzan.zbuilds.domain.repository.AppRepository
 import com.ranzan.zbuilds.domain.repository.PackageInspectorRepository
+import com.ranzan.zbuilds.domain.rules.AssetMatcher
+import com.ranzan.zbuilds.domain.rules.VersionRules
+import com.ranzan.zbuilds.domain.rules.downloadedBuildVersion
+import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 
 class AppRepositoryImpl(
     private val gitHubApiService: GitHubApiService,
@@ -23,6 +28,13 @@ class AppRepositoryImpl(
 
     override fun getTrackedApps(): Flow<List<TrackedApp>> =
         trackedAppsDataStore.getTrackedApps()
+            .map { apps ->
+                // Drop file paths whose downloaded file has been deleted, so the UI only reads state
+                apps.map { app ->
+                    if (app.localFilePath != null && !File(app.localFilePath).exists()) app.copy(localFilePath = null) else app
+                }
+            }
+            .flowOn(Dispatchers.IO)
 
     override suspend fun addTrackedApp(app: TrackedApp) {
         // Check if package is already installed on device
@@ -51,8 +63,17 @@ class AppRepositoryImpl(
         trackedAppsDataStore.deleteTrackedApp(id)
     }
 
-    override suspend fun fetchSourceReleases(sourceUrl: String): Result<SourceRelease> {
-        return gitHubApiService.fetchReleases(sourceUrl)
+    override suspend fun fetchSourceReleases(sourceUrl: String): Result<SourceRelease> =
+        fetchActiveRelease(sourceUrl)
+
+    /**
+     * Latest release that contains APK or ZIP files (or the newest release when none does).
+     */
+    private suspend fun fetchActiveRelease(sourceUrl: String): Result<SourceRelease> {
+        val releases = gitHubApiService.fetchReleases(sourceUrl).getOrElse { return Result.failure(it) }
+            .map { it.toDomain() }
+        if (releases.isEmpty()) return Result.failure(AppError.NoReleases())
+        return Result.success(releases.firstOrNull { it.assets.isNotEmpty() } ?: releases.first())
     }
 
     /**
@@ -72,7 +93,7 @@ class AppRepositoryImpl(
 
         while (hasMore && newReleases.isEmpty() && page - afterPage < MAX_PAGES_PER_LOAD) {
             val result = gitHubApiService.fetchReleasePage(sourceUrl, page + 1, RELEASES_PER_PAGE)
-            val releases = result.getOrElse { return Result.failure(it) }
+            val releases = result.getOrElse { return Result.failure(it) }.map { it.toDomain() }
             page++
             hasMore = releases.size == RELEASES_PER_PAGE
 
@@ -103,7 +124,7 @@ class AppRepositoryImpl(
             val updatedList = mutableListOf<TrackedApp>()
 
             for ((sourceUrl, appsInSource) in sourceGroups) {
-                val releaseResult = gitHubApiService.fetchReleases(sourceUrl)
+                val releaseResult = fetchActiveRelease(sourceUrl)
                 if (releaseResult.isSuccess) {
                     val release = releaseResult.getOrThrow()
                     for (app in appsInSource) {
@@ -112,19 +133,7 @@ class AppRepositoryImpl(
                 } else {
                     // Retain current app info with updated package inspector status
                     for (app in appsInSource) {
-                        var isInstalled = app.isInstalled
-                        var installedVersion = app.installedVersion
-                        if (!app.packageName.isNullOrBlank()) {
-                            isInstalled = packageInspector.isPackageInstalled(app.packageName)
-                            installedVersion = packageInspector.getInstalledVersionName(app.packageName)
-                        }
-                        updatedList.add(
-                            app.copy(
-                                isInstalled = isInstalled,
-                                installedVersion = installedVersion,
-                                lastCheckedTimestamp = System.currentTimeMillis()
-                            )
-                        )
+                        updatedList.add(refreshInstallStatus(app).copy(lastCheckedTimestamp = System.currentTimeMillis()))
                     }
                 }
             }
@@ -138,7 +147,7 @@ class AppRepositoryImpl(
 
     override suspend fun checkAppUpdate(app: TrackedApp): Result<TrackedApp> {
         return try {
-            val releaseResult = gitHubApiService.fetchReleases(app.sourceUrl)
+            val releaseResult = fetchActiveRelease(app.sourceUrl)
             if (releaseResult.isFailure) {
                 return Result.failure(releaseResult.exceptionOrNull() ?: IllegalStateException())
             }
@@ -156,24 +165,19 @@ class AppRepositoryImpl(
      * Versions are compared per build (from each file name), not by the shared release tag,
      * because one release can ship several apps with different versions.
      */
-    private fun applyRelease(app: TrackedApp, release: SourceRelease): TrackedApp {
+    private fun applyRelease(trackedApp: TrackedApp, release: SourceRelease): TrackedApp {
+        val app = refreshInstallStatus(trackedApp)
         val matchedAsset = findMatchingAsset(app, release)
-
-        var isInstalled = app.isInstalled
-        var installedVersion = app.installedVersion
-        if (!app.packageName.isNullOrBlank()) {
-            isInstalled = packageInspector.isPackageInstalled(app.packageName)
-            installedVersion = packageInspector.getInstalledVersionName(app.packageName)
-        }
+        val installedVersion = app.installedVersion
 
         // Only flag an update when the tracked file exists in the new release,
         // otherwise the download would fetch a stale or unrelated file
         val hasUpdate = matchedAsset != null && run {
-            val versionFromFile = FormatHelper.versionFromAssetName(matchedAsset.name)
-                ?: FormatHelper.versionFromAssetName(release.tag)
-            val cleanLatest = FormatHelper.cleanVersionString(versionFromFile ?: release.tag)
-            val cleanDownloaded = FormatHelper.cleanVersionString(app.downloadedBuildVersion)
-            val cleanInstalled = installedVersion?.let { FormatHelper.cleanVersionString(it) }
+            val versionFromFile = VersionRules.versionFromAssetName(matchedAsset.name)
+                ?: VersionRules.versionFromAssetName(release.tag)
+            val cleanLatest = VersionRules.cleanVersionString(versionFromFile ?: release.tag)
+            val cleanDownloaded = VersionRules.cleanVersionString(app.downloadedBuildVersion)
+            val cleanInstalled = installedVersion?.let { VersionRules.cleanVersionString(it) }
 
             (cleanDownloaded.isNotBlank() && cleanLatest != cleanDownloaded) ||
                 // Installed version names can only be compared with a real version number
@@ -186,10 +190,25 @@ class AppRepositoryImpl(
             assetPattern = matchedAsset?.let { AssetMatcher.toPattern(it.name, it.releaseTag) } ?: app.assetPattern,
             latestDownloadUrl = matchedAsset?.downloadUrl ?: app.latestDownloadUrl,
             latestSizeBytes = matchedAsset?.sizeBytes ?: app.latestSizeBytes,
-            isInstalled = isInstalled,
-            installedVersion = installedVersion,
             hasUpdate = hasUpdate,
             lastCheckedTimestamp = System.currentTimeMillis()
+        )
+    }
+
+    /**
+     * Updates the package name (read from the downloaded APK when missing) and install status.
+     */
+    private fun refreshInstallStatus(app: TrackedApp): TrackedApp {
+        val packageName = app.packageName?.takeIf { it.isNotBlank() }
+            ?: app.localFilePath
+                ?.takeIf { it.endsWith(".apk", ignoreCase = true) && File(it).exists() }
+                ?.let { packageInspector.inspectApkPackageName(it) }
+        if (packageName.isNullOrBlank()) return app
+
+        return app.copy(
+            packageName = packageName,
+            isInstalled = packageInspector.isPackageInstalled(packageName),
+            installedVersion = packageInspector.getInstalledVersionName(packageName)
         )
     }
 

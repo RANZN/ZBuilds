@@ -98,6 +98,7 @@ import com.ranzan.zbuilds.ui.theme.TextMuted
 import com.ranzan.zbuilds.ui.theme.TextPrimary
 import com.ranzan.zbuilds.ui.theme.TextSecondary
 import com.ranzan.zbuilds.ui.theme.ZBuildsTheme
+import com.ranzan.zbuilds.ui.util.ClipboardHelper
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -150,16 +151,8 @@ fun SettingsScreenHost(
                 is SettingsUiEffect.LaunchFolderPicker -> {
                     folderPickerLauncher.launch(null)
                 }
-                is SettingsUiEffect.RequestPasteToken -> {
-                    try {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                        val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
-                        if (!clip.isNullOrBlank()) {
-                            viewModel.onAction(SettingsUiAction.OnTokenInputChanged(clip))
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                is SettingsUiEffect.RequestPasteToken -> ClipboardHelper.readText(context)?.let {
+                    viewModel.onAction(SettingsUiAction.OnTokenInputChanged(it))
                 }
                 is SettingsUiEffect.CopyToClipboard -> {
                     try {
@@ -945,10 +938,6 @@ fun SettingsScreen(
             }
 
             // Section 5: About ZBuilds
-            val context = LocalContext.current
-            val appVersionName = remember(context) {
-                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
-            }
             SettingsSectionCard(title = stringResource(R.string.settings_section_about)) {
                 Text(
                     text = stringResource(R.string.settings_about_description),
@@ -973,7 +962,7 @@ fun SettingsScreen(
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = appVersionName?.let { stringResource(R.string.settings_about_version, it) }
+                            text = state.appVersion?.let { stringResource(R.string.settings_about_version, it) }
                                 ?: stringResource(R.string.common_unknown),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = AccentGreenText,

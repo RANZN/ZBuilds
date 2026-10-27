@@ -1,11 +1,11 @@
 package com.ranzan.zbuilds
 
-import com.ranzan.zbuilds.core.utils.FormatHelper
-import com.ranzan.zbuilds.core.utils.downloadedBuildVersion
-import com.ranzan.zbuilds.core.utils.isLatestBuildInstalled
-import com.ranzan.zbuilds.core.utils.latestBuildVersion
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.TrackedApp
+import com.ranzan.zbuilds.domain.rules.VersionRules
+import com.ranzan.zbuilds.domain.rules.downloadedBuildVersion
+import com.ranzan.zbuilds.domain.rules.isLatestBuildInstalled
+import com.ranzan.zbuilds.domain.rules.latestBuildVersion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -33,12 +33,12 @@ class BuildVersionTest {
 
     @Test
     fun `versionFromAssetName reads the version in the file name`() {
-        assertEquals("2026.24.0", FormatHelper.versionFromAssetName("reddit-morphe-v2026.24.0-all.apk"))
-        assertEquals("9.20.53", FormatHelper.versionFromAssetName("music-morphe-v9.20.53-arm64-v8a.apk"))
-        assertEquals("0.118.1", FormatHelper.versionFromAssetName("termux-app_v0.118.1+github-debug_arm64-v8a.apk"))
-        assertEquals("1.2.3", FormatHelper.versionFromAssetName("v1.2.3"))
-        assertNull(FormatHelper.versionFromAssetName("app-arm64-v8a-release.apk"))
-        assertNull(FormatHelper.versionFromAssetName("20221119"))
+        assertEquals("2026.24.0", VersionRules.versionFromAssetName("reddit-morphe-v2026.24.0-all.apk"))
+        assertEquals("9.20.53", VersionRules.versionFromAssetName("music-morphe-v9.20.53-arm64-v8a.apk"))
+        assertEquals("0.118.1", VersionRules.versionFromAssetName("termux-app_v0.118.1+github-debug_arm64-v8a.apk"))
+        assertEquals("1.2.3", VersionRules.versionFromAssetName("v1.2.3"))
+        assertNull(VersionRules.versionFromAssetName("app-arm64-v8a-release.apk"))
+        assertNull(VersionRules.versionFromAssetName("20221119"))
     }
 
     @Test

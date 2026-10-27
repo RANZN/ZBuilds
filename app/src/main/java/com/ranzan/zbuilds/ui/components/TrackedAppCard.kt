@@ -46,22 +46,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.drawable.toBitmap
 import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.core.utils.FormatHelper
-import com.ranzan.zbuilds.core.utils.downloadedBuildVersion
-import com.ranzan.zbuilds.core.utils.isLatestBuildInstalled
-import com.ranzan.zbuilds.core.utils.latestBuildVersion
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
+import com.ranzan.zbuilds.domain.rules.downloadedBuildVersion
+import com.ranzan.zbuilds.domain.rules.isLatestBuildInstalled
+import com.ranzan.zbuilds.domain.rules.latestBuildVersion
 import com.ranzan.zbuilds.ui.theme.AccentGreen
 import com.ranzan.zbuilds.ui.theme.AccentOrange
 import com.ranzan.zbuilds.ui.theme.AccentPurple
@@ -73,7 +70,7 @@ import com.ranzan.zbuilds.ui.theme.GreenPrimary
 import com.ranzan.zbuilds.ui.theme.TextMuted
 import com.ranzan.zbuilds.ui.theme.TextPrimary
 import com.ranzan.zbuilds.ui.theme.TextSecondary
-import java.io.File
+import com.ranzan.zbuilds.ui.util.rememberInstalledAppIcon
 
 @Composable
 fun TrackedAppCard(
@@ -89,44 +86,14 @@ fun TrackedAppCard(
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     val isDownloading = downloadProgress is DownloadProgress.Downloading
-    val fileExists = app.localFilePath?.let { File(it).exists() } == true
+    // The repository clears localFilePath when the downloaded file no longer exists
+    val fileExists = app.localFilePath != null
 
-    // Retrieve system app icon if installed
-    val installedAppIcon = remember(app.isInstalled, app.packageName, app.localFilePath) {
-        if (app.fileType == AppFileType.APK) {
-            val pkg = app.packageName ?: app.localFilePath?.let { path ->
-                try {
-                    context.packageManager.getPackageArchiveInfo(path, 0)?.packageName
-                } catch (e: Exception) {
-                    null
-                }
-            }
-            if (!pkg.isNullOrBlank()) {
-                try {
-                    context.packageManager.getApplicationIcon(pkg)
-                } catch (e: Exception) {
-                    null
-                }
-            } else {
-                null
-            }
-        } else {
-            null
-        }
-    }
-
-    val installedAppBitmap = remember(installedAppIcon) {
-        installedAppIcon?.let { drawable ->
-            try {
-                drawable.toBitmap().asImageBitmap()
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
+    val installedAppBitmap = rememberInstalledAppIcon(
+        packageName = app.packageName.takeIf { app.isInstalled && app.fileType == AppFileType.APK }
+    )
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -203,15 +170,7 @@ fun TrackedAppCard(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
-                        val targetPkg = app.packageName ?: (if (app.fileType == AppFileType.APK) {
-                            app.localFilePath?.let { path ->
-                                try {
-                                    context.packageManager.getPackageArchiveInfo(path, 0)?.packageName
-                                } catch (_: Exception) {
-                                    null
-                                }
-                            }
-                        } else null)
+                        val targetPkg = app.packageName
 
                         if (app.isInstalled && !targetPkg.isNullOrBlank()) {
                             DropdownMenuItem(
