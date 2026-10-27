@@ -1,8 +1,8 @@
 package com.ranzan.zbuilds.core.utils
 
-enum class BuildVariant(val displayName: String) {
-    DEBUG("Debug"),
-    RELEASE("Release")
+enum class BuildVariant {
+    DEBUG,
+    RELEASE
 }
 
 object BuildVariantHelper {
@@ -39,6 +39,30 @@ object BuildVariantHelper {
             }
             else -> null
         }
+    }
+
+    /**
+     * Resolves the build variant for an asset displayed on the Add App Source screen.
+     * Inspects the asset name and release tag for explicit indicators.
+     * Defaults to RELEASE for standard release binaries that do not explicitly designate debug.
+     */
+    fun resolveAssetVariant(assetName: String?, releaseTag: String? = null): BuildVariant {
+        val fromAsset = detectVariant(assetName)
+        if (fromAsset != null) return fromAsset
+
+        val fromTag = detectVariant(releaseTag)
+        if (fromTag != null) return fromTag
+
+        val lowerAsset = assetName?.lowercase().orEmpty()
+        val lowerTag = releaseTag?.lowercase().orEmpty()
+        if (lowerAsset.contains("debug") || lowerTag.contains("debug") ||
+            lowerAsset.contains("-dev") || lowerAsset.contains("_dev") ||
+            lowerTag.contains("-dev") || lowerTag.contains("_dev")
+        ) {
+            return BuildVariant.DEBUG
+        }
+
+        return BuildVariant.RELEASE
     }
 
     /**

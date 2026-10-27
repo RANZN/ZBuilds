@@ -14,8 +14,11 @@ object FormatHelper {
         return String.format(Locale.US, "%.1f %s", bytes / Math.pow(1024.0, index.toDouble()), units[index])
     }
 
-    fun formatDate(timestampMs: Long): String {
-        if (timestampMs <= 0) return "Unknown"
+    /**
+     * Formats a timestamp as a date, or returns null when it is not set.
+     */
+    fun formatDate(timestampMs: Long): String? {
+        if (timestampMs <= 0) return null
         val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
         return sdf.format(Date(timestampMs))
     }
@@ -23,6 +26,15 @@ object FormatHelper {
     fun cleanVersionString(version: String): String {
         return version.trim().removePrefix("v").removePrefix("V")
     }
+
+    private val assetVersionRegex = Regex("""(?<![a-z0-9])v?(\d+(?:\.\d+)+)""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Extracts the build version from an asset file name or tag,
+     * e.g. "reddit-morphe-v2026.24.0-all.apk" -> "2026.24.0". Returns null if none is present.
+     */
+    fun versionFromAssetName(name: String): String? =
+        assetVersionRegex.find(name)?.groupValues?.get(1)
 
     /**
      * Determines a clean display name from an APK or ZIP filename

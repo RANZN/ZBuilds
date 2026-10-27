@@ -1,13 +1,18 @@
 package com.ranzan.zbuilds.data.local
 
 import android.content.Context
-import android.os.Environment
 import android.net.Uri
+import android.os.Environment
 import androidx.documentfile.provider.DocumentFile
+import com.ranzan.zbuilds.domain.model.AppError
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
 import com.ranzan.zbuilds.domain.repository.PackageInspectorRepository
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,11 +24,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 
 class AppDownloader(
     private val context: Context,
@@ -70,11 +70,14 @@ class AppDownloader(
             }
 
             // Clean sanitized file name
-            val fileName = app.assetName.ifBlank {
+            // Save under the latest build's file name so each version keeps its own file
+            val fileName = app.latestAssetName.ifBlank { app.assetName }.ifBlank {
                 val ext = if (app.fileType == AppFileType.APK) ".apk" else ".zip"
                 "${app.name.replace(" ", "_")}_${app.latestVersion}$ext"
             }
             val destinationFile = File(downloadDir, fileName)
+            // Download into a temp file so a cancelled or failed download never destroys the existing build
+            val partialFile = File(downloadDir, "$fileName.part")
 
             val token = try { settingsDataStore?.getSettings()?.githubToken } catch (e: Exception) { null }
             val requestBuilder = Request.Builder()
@@ -88,48 +91,61 @@ class AppDownloader(
 
             val response = client.newCall(requestBuilder.build()).execute()
             if (!response.isSuccessful) {
-                val errorMsg = "HTTP error ${response.code}: ${response.message}"
-                flow.value = DownloadProgress.Failed(app.id, errorMsg)
-                return@withContext Result.failure(IOException(errorMsg))
+                val error = AppError.Http(response.code)
+                flow.value = DownloadProgress.Failed(app.id, error)
+                return@withContext Result.failure(error)
             }
 
-            val body = response.body ?: throw IOException("Empty response body")
+            val body = response.body ?: throw AppError.EmptyDownload()
             val totalBytes = if (body.contentLength() > 0) body.contentLength() else app.latestSizeBytes
 
-            body.byteStream().use { input ->
-                FileOutputStream(destinationFile).use { output ->
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    var totalDownloaded = 0L
-                    var lastEmittedTime = 0L
+            try {
+                body.byteStream().use { input ->
+                    FileOutputStream(partialFile).use { output ->
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+                        var totalDownloaded = 0L
+                        var lastEmittedTime = 0L
 
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        if (!currentCoroutineContext().isActive) {
-                            destinationFile.delete()
-                            throw CancellationException("Download canceled")
-                        }
-
-                        output.write(buffer, 0, bytesRead)
-                        totalDownloaded += bytesRead
-
-                        val now = System.currentTimeMillis()
-                        if (now - lastEmittedTime > 200 || totalDownloaded == totalBytes) {
-                            lastEmittedTime = now
-                            val percent = if (totalBytes > 0) {
-                                (totalDownloaded.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                            } else {
-                                0.5f
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            if (!currentCoroutineContext().isActive) {
+                                partialFile.delete()
+                                throw CancellationException()
                             }
-                            flow.value = DownloadProgress.Downloading(
-                                appId = app.id,
-                                progressPercent = percent,
-                                downloadedBytes = totalDownloaded,
-                                totalBytes = totalBytes
-                            )
+
+                            output.write(buffer, 0, bytesRead)
+                            totalDownloaded += bytesRead
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmittedTime > 200 || totalDownloaded == totalBytes) {
+                                lastEmittedTime = now
+                                val percent = if (totalBytes > 0) {
+                                    (totalDownloaded.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                } else {
+                                    0.5f
+                                }
+                                flow.value = DownloadProgress.Downloading(
+                                    appId = app.id,
+                                    progressPercent = percent,
+                                    downloadedBytes = totalDownloaded,
+                                    totalBytes = totalBytes
+                                )
+                            }
                         }
+                        output.flush()
                     }
-                    output.flush()
                 }
+            } catch (e: Exception) {
+                partialFile.delete()
+                throw e
+            }
+
+            if (destinationFile.exists()) {
+                destinationFile.delete()
+            }
+            if (!partialFile.renameTo(destinationFile)) {
+                partialFile.delete()
+                throw AppError.SaveFailed()
             }
 
             // Post-download inspection
@@ -148,6 +164,7 @@ class AppDownloader(
 
             val updatedApp = app.copy(
                 downloadedVersion = app.latestVersion,
+                assetName = app.latestAssetName.ifBlank { app.assetName },
                 localFilePath = destinationFile.absolutePath,
                 packageName = updatedPackageName,
                 isInstalled = isInstalled,
@@ -201,7 +218,7 @@ class AppDownloader(
             flow.value = DownloadProgress.Idle(app.id)
             Result.failure(e)
         } catch (e: Exception) {
-            flow.value = DownloadProgress.Failed(app.id, e.message ?: "Download failed")
+            flow.value = DownloadProgress.Failed(app.id, e)
             Result.failure(e)
         } finally {
             activeJobs.remove(app.id)

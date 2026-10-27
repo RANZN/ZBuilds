@@ -14,6 +14,7 @@ data class TrackedApp(
     val assetPattern: String = "",
     val downloadedVersion: String,
     val latestVersion: String,
+    val latestAssetName: String = "",
     val latestDownloadUrl: String,
     val latestSizeBytes: Long = 0L,
     val localFilePath: String? = null,

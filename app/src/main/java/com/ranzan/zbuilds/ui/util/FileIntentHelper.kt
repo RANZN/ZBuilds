@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.ranzan.zbuilds.R
 import com.ranzan.zbuilds.domain.model.AppFileType
 import java.io.File
 
@@ -15,7 +16,7 @@ object FileIntentHelper {
         try {
             val file = File(filePath)
             if (!file.exists()) {
-                Toast.makeText(context, "APK file not found: $filePath", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.intent_apk_not_found, filePath), Toast.LENGTH_SHORT).show()
                 return
             }
 
@@ -32,7 +33,7 @@ object FileIntentHelper {
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            Toast.makeText(context, "Failed to launch installer: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.intent_installer_failed, e.message.orEmpty()), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -40,7 +41,7 @@ object FileIntentHelper {
         try {
             val file = File(filePath)
             if (!file.exists()) {
-                Toast.makeText(context, "ZIP file not found: $filePath", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.intent_zip_not_found, filePath), Toast.LENGTH_SHORT).show()
                 return
             }
 
@@ -57,12 +58,12 @@ object FileIntentHelper {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
 
-            val chooser = Intent.createChooser(viewIntent, "Open or Flash ZIP Module").apply {
+            val chooser = Intent.createChooser(viewIntent, context.getString(R.string.intent_zip_chooser_title)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(chooser)
         } catch (e: Exception) {
-            Toast.makeText(context, "Could not open ZIP: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.intent_zip_open_failed, e.message.orEmpty()), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -73,10 +74,10 @@ object FileIntentHelper {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(launchIntent)
             } else {
-                Toast.makeText(context, "Could not open application", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.intent_app_open_failed), Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "Error opening app: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.intent_app_open_error, e.message.orEmpty()), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -88,7 +89,7 @@ object FileIntentHelper {
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            Toast.makeText(context, "Error launching uninstaller: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.intent_uninstall_failed, e.message.orEmpty()), Toast.LENGTH_SHORT).show()
         }
     }
 }

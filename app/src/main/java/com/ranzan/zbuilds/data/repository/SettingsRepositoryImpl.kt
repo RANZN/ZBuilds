@@ -5,11 +5,12 @@ import android.os.Environment
 import com.ranzan.zbuilds.data.local.SettingsDataStore
 import com.ranzan.zbuilds.data.remote.GitHubApiService
 import com.ranzan.zbuilds.domain.model.AppSettings
+import com.ranzan.zbuilds.domain.model.GithubTokenStatus
 import com.ranzan.zbuilds.domain.repository.SettingsRepository
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import java.io.File
 
 class SettingsRepositoryImpl(
     private val context: Context,
@@ -77,7 +78,7 @@ class SettingsRepositoryImpl(
         }
     }
 
-    override suspend fun validateGithubToken(token: String): Result<String> {
+    override suspend fun validateGithubToken(token: String): Result<GithubTokenStatus> {
         return gitHubApiService.validateToken(token)
     }
 }

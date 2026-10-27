@@ -62,4 +62,26 @@ class BuildVariantHelperTest {
         )
         assertNull(unknownVariant)
     }
+
+    @Test
+    fun `resolveAssetVariant resolves debug and release builds accurately`() {
+        // Explicit asset names
+        assertEquals(BuildVariant.DEBUG, BuildVariantHelper.resolveAssetVariant("app-debug.apk"))
+        assertEquals(BuildVariant.RELEASE, BuildVariantHelper.resolveAssetVariant("app-release.apk"))
+
+        // Release tag with debug
+        assertEquals(BuildVariant.DEBUG, BuildVariantHelper.resolveAssetVariant("app.apk", "v1.0.0-debug"))
+        assertEquals(BuildVariant.RELEASE, BuildVariantHelper.resolveAssetVariant("app.apk", "v1.0.0-release"))
+
+        // Generic GitHub release names without debug keyword default to RELEASE
+        assertEquals(BuildVariant.RELEASE, BuildVariantHelper.resolveAssetVariant("YouTube-Morphe-21.20.405.apk"))
+        assertEquals(BuildVariant.RELEASE, BuildVariantHelper.resolveAssetVariant("Spotube-android-all.apk"))
+        assertEquals(BuildVariant.RELEASE, BuildVariantHelper.resolveAssetVariant("NewPipe_v0.27.0.apk"))
+        assertEquals(BuildVariant.RELEASE, BuildVariantHelper.resolveAssetVariant("revanced-magisk-module-v21.20.405.zip"))
+        assertEquals(BuildVariant.RELEASE, BuildVariantHelper.resolveAssetVariant(null, null))
+
+        // Contains debug or dev in asset name
+        assertEquals(BuildVariant.DEBUG, BuildVariantHelper.resolveAssetVariant("termux-app_v0.118.1+github-debug_arm64-v8a.apk"))
+        assertEquals(BuildVariant.DEBUG, BuildVariantHelper.resolveAssetVariant("app-dev-arm64.apk"))
+    }
 }

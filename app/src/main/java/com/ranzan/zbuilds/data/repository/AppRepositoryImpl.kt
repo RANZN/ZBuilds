@@ -1,11 +1,13 @@
 package com.ranzan.zbuilds.data.repository
 
-import com.ranzan.zbuilds.core.utils.ArchitectureHelper
+import com.ranzan.zbuilds.core.utils.AssetMatcher
 import com.ranzan.zbuilds.core.utils.FormatHelper
+import com.ranzan.zbuilds.core.utils.downloadedBuildVersion
 import com.ranzan.zbuilds.data.local.TrackedAppsDataStore
 import com.ranzan.zbuilds.data.remote.GitHubApiService
 import com.ranzan.zbuilds.data.remote.SourceUrlParser
-import com.ranzan.zbuilds.domain.model.AppFileType
+import com.ranzan.zbuilds.domain.model.OlderReleasesPage
+import com.ranzan.zbuilds.domain.model.ReleaseAsset
 import com.ranzan.zbuilds.domain.model.SourceRelease
 import com.ranzan.zbuilds.domain.model.TrackedApp
 import com.ranzan.zbuilds.domain.repository.AppRepository
@@ -34,7 +36,9 @@ class AppRepositoryImpl(
 
         val enrichedApp = app.copy(
             isInstalled = isInstalled,
-            installedVersion = installedVersion
+            installedVersion = installedVersion,
+            // Version-independent file name pattern used to find this file in future releases
+            assetPattern = app.assetPattern.ifBlank { AssetMatcher.toPattern(app.assetName, app.latestVersion) }
         )
         trackedAppsDataStore.addTrackedApp(enrichedApp)
     }
@@ -49,6 +53,42 @@ class AppRepositoryImpl(
 
     override suspend fun fetchSourceReleases(sourceUrl: String): Result<SourceRelease> {
         return gitHubApiService.fetchReleases(sourceUrl)
+    }
+
+    /**
+     * Pages through older releases and keeps only files not already in [listedReleases].
+     * Checks up to [MAX_PAGES_PER_LOAD] pages so one call stops once something new is found.
+     */
+    override suspend fun fetchOlderReleases(
+        sourceUrl: String,
+        listedReleases: List<SourceRelease>,
+        afterPage: Int
+    ): Result<OlderReleasesPage> {
+        val listedTags = listedReleases.map { it.tag }.toSet()
+        val knownPatterns = AssetMatcher.patternsOf(listedReleases).toMutableSet()
+        val newReleases = mutableListOf<SourceRelease>()
+        var page = afterPage
+        var hasMore = true
+
+        while (hasMore && newReleases.isEmpty() && page - afterPage < MAX_PAGES_PER_LOAD) {
+            val result = gitHubApiService.fetchReleasePage(sourceUrl, page + 1, RELEASES_PER_PAGE)
+            val releases = result.getOrElse { return Result.failure(it) }
+            page++
+            hasMore = releases.size == RELEASES_PER_PAGE
+
+            val filtered = AssetMatcher.filterNewAssets(releases.filter { it.tag !in listedTags }, knownPatterns)
+            knownPatterns += AssetMatcher.patternsOf(filtered)
+            newReleases += filtered
+        }
+
+        return Result.success(
+            OlderReleasesPage(
+                releases = newReleases,
+                lastLoadedPage = page,
+                pagesChecked = page - afterPage,
+                hasMore = hasMore
+            )
+        )
     }
 
     override suspend fun checkForUpdates(): Result<List<TrackedApp>> {
@@ -67,36 +107,7 @@ class AppRepositoryImpl(
                 if (releaseResult.isSuccess) {
                     val release = releaseResult.getOrThrow()
                     for (app in appsInSource) {
-                        val matchedAsset = findMatchingAsset(app, release)
-                        val latestTag = release.tag
-
-                        // Clean version strings for reliable comparison
-                        val cleanLatest = FormatHelper.cleanVersionString(latestTag)
-                        val cleanDownloaded = FormatHelper.cleanVersionString(app.downloadedVersion)
-
-                        var isInstalled = app.isInstalled
-                        var installedVersion = app.installedVersion
-                        if (!app.packageName.isNullOrBlank()) {
-                            isInstalled = packageInspector.isPackageInstalled(app.packageName)
-                            installedVersion = packageInspector.getInstalledVersionName(app.packageName)
-                        }
-
-                        val cleanInstalled = installedVersion?.let { FormatHelper.cleanVersionString(it) }
-
-                        // Has update if latest is different from downloaded, or different from installed
-                        val hasUpdate = (cleanLatest != cleanDownloaded && cleanDownloaded.isNotBlank()) ||
-                                (cleanInstalled != null && cleanLatest != cleanInstalled)
-
-                        val updatedApp = app.copy(
-                            latestVersion = latestTag,
-                            latestDownloadUrl = matchedAsset?.downloadUrl ?: app.latestDownloadUrl,
-                            latestSizeBytes = matchedAsset?.sizeBytes ?: app.latestSizeBytes,
-                            isInstalled = isInstalled,
-                            installedVersion = installedVersion,
-                            hasUpdate = hasUpdate,
-                            lastCheckedTimestamp = System.currentTimeMillis()
-                        )
-                        updatedList.add(updatedApp)
+                        updatedList.add(applyRelease(app, release))
                     }
                 } else {
                     // Retain current app info with updated package inspector status
@@ -129,37 +140,10 @@ class AppRepositoryImpl(
         return try {
             val releaseResult = gitHubApiService.fetchReleases(app.sourceUrl)
             if (releaseResult.isFailure) {
-                return Result.failure(releaseResult.exceptionOrNull() ?: Exception("Unknown error"))
+                return Result.failure(releaseResult.exceptionOrNull() ?: IllegalStateException())
             }
 
-            val release = releaseResult.getOrThrow()
-            val matchedAsset = findMatchingAsset(app, release)
-            val latestTag = release.tag
-
-            val cleanLatest = FormatHelper.cleanVersionString(latestTag)
-            val cleanDownloaded = FormatHelper.cleanVersionString(app.downloadedVersion)
-
-            var isInstalled = app.isInstalled
-            var installedVersion = app.installedVersion
-            if (!app.packageName.isNullOrBlank()) {
-                isInstalled = packageInspector.isPackageInstalled(app.packageName)
-                installedVersion = packageInspector.getInstalledVersionName(app.packageName)
-            }
-
-            val cleanInstalled = installedVersion?.let { FormatHelper.cleanVersionString(it) }
-
-            val hasUpdate = (cleanLatest != cleanDownloaded && cleanDownloaded.isNotBlank()) ||
-                    (cleanInstalled != null && cleanLatest != cleanInstalled)
-
-            val updatedApp = app.copy(
-                latestVersion = latestTag,
-                latestDownloadUrl = matchedAsset?.downloadUrl ?: app.latestDownloadUrl,
-                latestSizeBytes = matchedAsset?.sizeBytes ?: app.latestSizeBytes,
-                isInstalled = isInstalled,
-                installedVersion = installedVersion,
-                hasUpdate = hasUpdate,
-                lastCheckedTimestamp = System.currentTimeMillis()
-            )
+            val updatedApp = applyRelease(app, releaseResult.getOrThrow())
             trackedAppsDataStore.updateTrackedApp(updatedApp)
             Result.success(updatedApp)
         } catch (e: Exception) {
@@ -167,27 +151,60 @@ class AppRepositoryImpl(
         }
     }
 
-    private fun findMatchingAsset(app: TrackedApp, release: SourceRelease): com.ranzan.zbuilds.domain.model.ReleaseAsset? {
-        val sameTypeAssets = release.assets.filter { it.fileType == app.fileType }
-        if (sameTypeAssets.isEmpty()) return null
+    /**
+     * Refreshes install status and the latest build info for [app] from [release].
+     * Versions are compared per build (from each file name), not by the shared release tag,
+     * because one release can ship several apps with different versions.
+     */
+    private fun applyRelease(app: TrackedApp, release: SourceRelease): TrackedApp {
+        val matchedAsset = findMatchingAsset(app, release)
 
-        // 1. Try matching by exact asset name if filename doesn't contain version
-        val exactMatch = sameTypeAssets.firstOrNull { it.name.equals(app.assetName, ignoreCase = true) }
-        if (exactMatch != null) return exactMatch
-
-        // 2. Try matching by normalized base name and architecture
-        val appBaseName = FormatHelper.deriveAppNameFromAsset(app.assetName).lowercase()
-        val archMatches = sameTypeAssets.filter { asset ->
-            val assetBaseName = FormatHelper.deriveAppNameFromAsset(asset.name).lowercase()
-            assetBaseName == appBaseName && asset.arch.equals(app.arch, ignoreCase = true)
+        var isInstalled = app.isInstalled
+        var installedVersion = app.installedVersion
+        if (!app.packageName.isNullOrBlank()) {
+            isInstalled = packageInspector.isPackageInstalled(app.packageName)
+            installedVersion = packageInspector.getInstalledVersionName(app.packageName)
         }
-        if (archMatches.isNotEmpty()) return archMatches.first()
 
-        // 3. Match by architecture among matching file type
-        val archOnlyMatches = sameTypeAssets.filter { it.arch.equals(app.arch, ignoreCase = true) }
-        if (archOnlyMatches.isNotEmpty()) return archOnlyMatches.first()
+        // Only flag an update when the tracked file exists in the new release,
+        // otherwise the download would fetch a stale or unrelated file
+        val hasUpdate = matchedAsset != null && run {
+            val versionFromFile = FormatHelper.versionFromAssetName(matchedAsset.name)
+                ?: FormatHelper.versionFromAssetName(release.tag)
+            val cleanLatest = FormatHelper.cleanVersionString(versionFromFile ?: release.tag)
+            val cleanDownloaded = FormatHelper.cleanVersionString(app.downloadedBuildVersion)
+            val cleanInstalled = installedVersion?.let { FormatHelper.cleanVersionString(it) }
 
-        // 4. Fallback to first compatible asset
-        return sameTypeAssets.firstOrNull { ArchitectureHelper.isArchCompatible(it.arch) } ?: sameTypeAssets.first()
+            (cleanDownloaded.isNotBlank() && cleanLatest != cleanDownloaded) ||
+                // Installed version names can only be compared with a real version number
+                (versionFromFile != null && cleanInstalled != null && cleanLatest != cleanInstalled)
+        }
+
+        return app.copy(
+            latestVersion = if (matchedAsset != null) release.tag else app.latestVersion,
+            latestAssetName = matchedAsset?.name ?: app.latestAssetName,
+            assetPattern = matchedAsset?.let { AssetMatcher.toPattern(it.name, it.releaseTag) } ?: app.assetPattern,
+            latestDownloadUrl = matchedAsset?.downloadUrl ?: app.latestDownloadUrl,
+            latestSizeBytes = matchedAsset?.sizeBytes ?: app.latestSizeBytes,
+            isInstalled = isInstalled,
+            installedVersion = installedVersion,
+            hasUpdate = hasUpdate,
+            lastCheckedTimestamp = System.currentTimeMillis()
+        )
+    }
+
+    private fun findMatchingAsset(app: TrackedApp, release: SourceRelease): ReleaseAsset? =
+        AssetMatcher.findMatchingAsset(
+            trackedAssetName = app.assetName,
+            trackedPattern = app.assetPattern,
+            trackedVersion = app.downloadedVersion.ifBlank { null },
+            fileType = app.fileType,
+            arch = app.arch,
+            assets = release.assets
+        )
+
+    private companion object {
+        const val RELEASES_PER_PAGE = 10
+        const val MAX_PAGES_PER_LOAD = 3
     }
 }

@@ -1,6 +1,7 @@
 package com.ranzan.zbuilds.domain.repository
 
 import com.ranzan.zbuilds.domain.model.AppSettings
+import com.ranzan.zbuilds.domain.model.GithubTokenStatus
 import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {
@@ -11,5 +12,5 @@ interface SettingsRepository {
     suspend fun updateAutoClean(enabled: Boolean)
     suspend fun updateCleanupRetentionDays(days: Int)
     suspend fun clearDownloadCache(): Result<Long>
-    suspend fun validateGithubToken(token: String): Result<String>
+    suspend fun validateGithubToken(token: String): Result<GithubTokenStatus>
 }

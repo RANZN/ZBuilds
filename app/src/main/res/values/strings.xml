@@ -2,14 +2,15 @@
     <string name="app_name">ZBuilds</string>
 
     <!-- Top Bar & Search -->
-    <string name="home_search_placeholder">Search apps, modules, versions…</string>
+    <string name="home_search_placeholder">Search apps, versions, or files…</string>
+    <string name="home_search_desc">Search</string>
+    <string name="home_search_clear_desc">Clear search</string>
     <string name="home_btn_add">Add</string>
     <string name="home_settings_desc">Settings</string>
 
     <!-- Home Banner -->
     <string name="home_banner_title">Install/Update apps</string>
-    <string name="home_banner_all_updated">✓ All %1$d apps are up to date</string>
-    <string name="home_banner_updates_available">⚡ %1$d update(s) available to download</string>
+    
     <string name="home_banner_no_apps">Add app sources to start tracking updates</string>
     <string name="home_banner_downloading_updates">⬇️ Downloading available updates…</string>
     <string name="home_btn_update">Update</string>
@@ -32,12 +33,43 @@
     <string name="home_status_downloading">Downloading</string>
     <string name="home_msg_all_up_to_date">All tracked apps are up to date</string>
     <string name="home_msg_checking_updates">Checking for available updates…</string>
-    <string name="home_msg_starting_downloads">Starting download for %1$d update(s)…</string>
-    <string name="home_msg_found_updates">Found %1$d update(s). Starting downloads…</string>
+    <string name="home_msg_checking">Checking for updates…</string>
+    <string name="home_msg_check_failed">Failed to check updates: %1$s</string>
+    <string name="home_msg_checking_app">Checking %1$s for updates…</string>
+    <string name="home_msg_app_update_available">Update available for %1$s (%2$s)</string>
+    <string name="home_msg_app_up_to_date">%1$s is up to date</string>
+    <string name="home_msg_app_removed">App removed from tracked list</string>
+    <string name="home_msg_app_added">Added %1$s to tracked apps</string>
+    <string name="home_msg_downloaded">Downloaded %1$s (%2$s)</string>
+    <string name="home_msg_download_failed">Download failed: %1$s</string>
+
+    <plurals name="home_banner_all_updated">
+        <item quantity="one">✓ %1$d app is up to date</item>
+        <item quantity="other">✓ All %1$d apps are up to date</item>
+    </plurals>
+    <plurals name="home_banner_updates_available">
+        <item quantity="one">⚡ %1$d update available to download</item>
+        <item quantity="other">⚡ %1$d updates available to download</item>
+    </plurals>
+    <plurals name="home_msg_updates_available">
+        <item quantity="one">%1$d update available!</item>
+        <item quantity="other">%1$d updates available!</item>
+    </plurals>
+    <plurals name="home_msg_starting_downloads">
+        <item quantity="one">Starting download for %1$d update…</item>
+        <item quantity="other">Starting download for %1$d updates…</item>
+    </plurals>
+    <plurals name="home_msg_found_updates">
+        <item quantity="one">Found %1$d update. Starting download…</item>
+        <item quantity="other">Found %1$d updates. Starting downloads…</item>
+    </plurals>
 
     <!-- Tracked App Card -->
     <string name="card_version_label">Version: %1$s • %2$s</string>
     <string name="card_options_desc">Options</string>
+    <string name="card_icon_desc">%1$s icon</string>
+    <string name="card_progress_percent">%1$d%%</string>
+    <string name="card_progress_bytes">%1$s / %2$s</string>
     <string name="card_menu_open">Open App</string>
     <string name="card_menu_uninstall">Uninstall App</string>
     <string name="card_menu_check_updates">Check Updates</string>
@@ -48,24 +80,43 @@
     <string name="card_btn_cancel_download">Cancel Download</string>
     <string name="card_btn_update_now">Update Now</string>
     <string name="card_btn_install_apk">Install APK</string>
+    <string name="card_btn_installed">Installed</string>
     <string name="card_btn_download_apk">Download APK</string>
     <string name="card_btn_open_app">Open App</string>
     <string name="card_btn_flash_zip">Flash / Open ZIP</string>
     <string name="card_btn_download_zip">Download ZIP</string>
     <string name="card_btn_redownload">Re-download</string>
 
-    <!-- Add App Source Sheet -->
-    <string name="sheet_add_title">Add App Source</string>
-    <string name="sheet_add_subtitle">Enter any GitHub repo or release URL to discover available downloads</string>
-    <string name="sheet_input_placeholder">https://github.com/owner/repo/releases</string>
-    <string name="sheet_clear_desc">Clear</string>
-    <string name="sheet_paste_desc">Paste</string>
-    <string name="sheet_suggestions_label">Suggested Sources (tap to load):</string>
-    <string name="sheet_btn_fetch">Fetch Release Downloads</string>
-    <string name="sheet_btn_fetching">Fetching Releases…</string>
-    <string name="sheet_release_found_title">Release: %1$s (%2$d downloads found)</string>
-    <string name="sheet_select_instruction">Select what you want to download and add to home screen:</string>
-    <string name="sheet_download_desc">Download</string>
+    <!-- Add App Source Screen -->
+    <string name="add_source_title">Add App Source</string>
+    <string name="add_source_subtitle">Enter any GitHub repo or release URL to discover available downloads</string>
+    <string name="add_source_input_placeholder">https://github.com/owner/repo/releases</string>
+    <string name="add_source_clear_desc">Clear</string>
+    <string name="add_source_paste_desc">Paste</string>
+    <string name="add_source_btn_fetch">Fetch Downloads</string>
+    <string name="add_source_btn_fetching">Fetching Available Downloads…</string>
+    <plurals name="add_source_release_found_title">
+        <item quantity="one">Release: %1$s (%2$d download found)</item>
+        <item quantity="other">Release: %1$s (%2$d downloads found)</item>
+    </plurals>
+    <string name="add_source_select_instruction">Select what you want to download and add to home screen:</string>
+    <string name="add_source_download_desc">Download</string>
+    <string name="add_source_asset_meta">%1$s • %2$s</string>
+    <string name="add_source_error_empty_url">Please enter a GitHub repository URL</string>
+    <string name="add_source_error_no_assets">No APK or ZIP assets found in this release</string>
+    <string name="add_source_no_other_files">No other files found in older releases</string>
+    <plurals name="add_source_no_new_files">
+        <item quantity="one">No new files in the last %1$d page of older releases. Tap again to keep looking.</item>
+        <item quantity="other">No new files in the last %1$d pages of older releases. Tap again to keep looking.</item>
+    </plurals>
+    <string name="file_type_apk">APK</string>
+    <string name="file_type_zip">ZIP</string>
+    <string name="add_source_back_desc">Back</string>
+    <string name="add_source_older_release_title">Older release: %1$s</string>
+    <string name="add_source_btn_load_older">Load older releases</string>
+    <string name="add_source_loading_older">Loading older releases…</string>
+    <string name="badge_variant_debug">Debug</string>
+    <string name="badge_variant_release">Release</string>
 
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
@@ -81,6 +132,13 @@
     <string name="settings_token_show">Show token</string>
     <string name="settings_token_hide">Hide token</string>
     <string name="settings_token_active">✓ Token Saved &amp; Active</string>
+    <string name="settings_token_masked">••••••••••••%1$s</string>
+    <string name="settings_msg_token_saved">GitHub token saved</string>
+    <string name="settings_msg_token_cleared">GitHub token cleared</string>
+    <string name="settings_msg_token_removed">GitHub token removed</string>
+    <string name="settings_msg_token_empty">Please enter a token first to test.</string>
+    <string name="settings_msg_token_valid">Token valid! Authenticated as @%1$s (%2$s/%3$s req/hr remaining)</string>
+    <string name="settings_token_unknown_user">User</string>
     <string name="settings_btn_save">Save</string>
     <string name="settings_btn_test">Test</string>
     <string name="settings_btn_remove">Remove Token</string>
@@ -94,6 +152,8 @@
     <string name="settings_format_apks_desc">Standard Android apps</string>
     <string name="settings_format_modules">Modules</string>
     <string name="settings_format_modules_desc">Root / Magisk zips</string>
+    <string name="settings_msg_formats_required">At least one format (APKs or Modules) must remain selected.</string>
+    <string name="settings_msg_formats_updated">Build formats updated</string>
 
     <!-- Settings Section 3: Storage & Cleanup -->
     <string name="settings_section_storage">Storage &amp; Cleanup</string>
@@ -109,6 +169,17 @@
     <string name="settings_retention_7_days">7 Days</string>
     <string name="settings_retention_30_days">30 Days</string>
     <string name="settings_btn_clean_cache">Clean Cache / Storage</string>
+    <string name="settings_folder_custom">Custom Folder</string>
+    <string name="settings_msg_folder_updated">Download folder updated: %1$s</string>
+    <string name="settings_msg_folder_reset">Reset to default app storage</string>
+    <string name="settings_msg_auto_clean_on">Auto-clean old versions enabled</string>
+    <string name="settings_msg_auto_clean_off">Auto-clean disabled</string>
+    <string name="settings_msg_storage_cleaned">Cleaned storage: %1$s freed</string>
+    <string name="settings_msg_storage_clean_failed">Failed to clean storage: %1$s</string>
+    <plurals name="settings_msg_retention_set">
+        <item quantity="one">Cleanup retention set to %1$d day</item>
+        <item quantity="other">Cleanup retention set to %1$d days</item>
+    </plurals>
 
     <!-- Settings Section 4: Diagnostics & Crash Reports (FOSS Local) -->
     <string name="settings_section_diagnostics">Diagnostics &amp; Crash Reports</string>
@@ -123,6 +194,12 @@
     <string name="settings_btn_share_log">Share Log</string>
     <string name="settings_crash_latest_title">Latest Crash: %1$s</string>
     <string name="settings_crash_no_message">No error message</string>
+    <string name="settings_crash_recorded_reports">Recorded Reports</string>
+    <string name="settings_crash_meta">%1$s • %2$s</string>
+    <string name="settings_msg_crashes_cleared">Local crash reports cleared</string>
+    <string name="settings_msg_crash_copied">Crash report copied to clipboard</string>
+    <string name="settings_crash_clipboard_label">Crash Report</string>
+    <string name="settings_crash_share_title">ZBuilds Crash Report</string>
 
     <!-- Settings Section 5: About ZBuilds -->
     <string name="settings_section_about">About ZBuilds</string>
@@ -130,4 +207,59 @@
     <string name="settings_project_link_title">Project Source &amp; Updates</string>
     <string name="settings_project_link_desc">View code, report bugs, or request features on GitHub</string>
     <string name="settings_open_browser_desc">Open in browser</string>
+    <string name="settings_about_description">Universal GitHub release tracker and updater for Android apps and root modules.</string>
+    <string name="settings_about_tech_stack">Jetpack Compose • Material 3 • Clean Architecture • Koin DI • Storage Access Framework</string>
+    <string name="settings_about_version">v%1$s</string>
+
+    <!-- Common -->
+    <string name="common_unknown">Unknown</string>
+    <string name="settings_check_mark">✓</string>
+
+    <!-- Source Suggestions -->
+    <string name="suggestion_revanced_label">ReVanced Modules</string>
+    <string name="suggestion_revanced_desc">Pre-built ReVanced Magisk / KernelSU modules</string>
+    <string name="suggestion_microg_label">MicroG-RE</string>
+    <string name="suggestion_microg_desc">MicroG Revanced Edition APK releases</string>
+    <string name="suggestion_spotube_label">Spotube</string>
+    <string name="suggestion_spotube_desc">Open-source Spotify client</string>
+    <string name="suggestion_newpipe_label">NewPipe</string>
+    <string name="suggestion_newpipe_desc">Lightweight YouTube frontend</string>
+
+    <!-- Crash Report (copied, shared or posted as a GitHub issue) -->
+    <string name="crash_report_title">ZBuilds Crash Report</string>
+    <string name="crash_issue_title">[Crash] %1$s: %2$s</string>
+    <string name="crash_issue_heading">Crash Report (Auto-generated)</string>
+    <string name="crash_issue_intro">A crash was captured locally in ZBuilds.</string>
+    <string name="crash_issue_truncated">… [truncated for URL length]</string>
+    <string name="crash_uncaught_exception">Uncaught Exception</string>
+    <string name="crash_section_environment">Environment</string>
+    <string name="crash_section_exception">Exception</string>
+    <string name="crash_section_stack_trace">Stack Trace</string>
+    <string name="crash_section_breadcrumbs">Breadcrumbs</string>
+    <string name="crash_section_recent_breadcrumbs">Recent Breadcrumbs</string>
+    <string name="crash_label_app_version">App Version</string>
+    <string name="crash_label_device">Device</string>
+    <string name="crash_label_fatal">Fatal</string>
+    <string name="crash_label_thread">Thread</string>
+    <string name="crash_label_date">Date</string>
+    <string name="crash_device_info">%1$s %2$s (Android %3$s, API %4$d, ABI: %5$s)</string>
+
+    <!-- Errors -->
+    <string name="error_invalid_source_url">Invalid GitHub repository URL</string>
+    <string name="error_no_releases">No releases found in this repository</string>
+    <string name="error_github_http">GitHub returned an error (HTTP %1$d)</string>
+    <string name="error_token_rejected">Authentication failed (%1$d). Please verify your token.</string>
+    <string name="error_download_empty">The server returned an empty file</string>
+    <string name="error_download_save">Failed to save downloaded file</string>
+    <string name="error_unknown">Something went wrong</string>
+
+    <!-- System actions (install, open, share) -->
+    <string name="intent_apk_not_found">APK file not found: %1$s</string>
+    <string name="intent_installer_failed">Failed to launch installer: %1$s</string>
+    <string name="intent_zip_not_found">ZIP file not found: %1$s</string>
+    <string name="intent_zip_chooser_title">Open or Flash ZIP Module</string>
+    <string name="intent_zip_open_failed">Could not open ZIP: %1$s</string>
+    <string name="intent_app_open_failed">Could not open application</string>
+    <string name="intent_app_open_error">Error opening app: %1$s</string>
+    <string name="intent_uninstall_failed">Error launching uninstaller: %1$s</string>
 </resources>

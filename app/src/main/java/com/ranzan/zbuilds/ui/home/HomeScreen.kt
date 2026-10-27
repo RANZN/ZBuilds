@@ -1,6 +1,7 @@
 package com.ranzan.zbuilds.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,14 +34,15 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,10 +53,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ranzan.zbuilds.R
+import com.ranzan.zbuilds.core.base.asString
 import com.ranzan.zbuilds.domain.model.AppFileType
 import com.ranzan.zbuilds.domain.model.DownloadProgress
 import com.ranzan.zbuilds.domain.model.TrackedApp
-import com.ranzan.zbuilds.ui.components.AddAppSourceSheet
+import com.ranzan.zbuilds.ui.addsource.AddAppSourceScreen
 import com.ranzan.zbuilds.ui.components.TopSearchBar
 import com.ranzan.zbuilds.ui.components.TrackedAppCard
 import com.ranzan.zbuilds.ui.components.UpdateBannerCard
@@ -88,7 +93,7 @@ fun HomeScreenHost(
         viewModel.uiEffect.collect { effect ->
             when (effect) {
                 is HomeUiEffect.NavigateToSettings -> onSettingsClick()
-                is HomeUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
+                is HomeUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message.asString(context))
                 is HomeUiEffect.InstallApk -> FileIntentHelper.installApk(context, effect.filePath)
                 is HomeUiEffect.OpenApp -> FileIntentHelper.openApp(context, effect.packageName)
                 is HomeUiEffect.UninstallApp -> FileIntentHelper.uninstallApp(context, effect.packageName)
@@ -97,11 +102,38 @@ fun HomeScreenHost(
         }
     }
 
-    HomeScreen(
-        state = state,
-        snackbarHostState = snackbarHostState,
-        onAction = viewModel::onAction
-    )
+    // Kept here so the home list keeps its scroll position while Add App Source is open
+    val listState = rememberLazyListState()
+
+    if (state.isAddSourceOpen) {
+        AddAppSourceScreen(
+            sourceUrl = state.addSourceUrl,
+            isFetching = state.isFetchingSource,
+            fetchedRelease = state.fetchedRelease,
+            errorMessage = state.addSourceError?.asString(),
+            olderReleases = state.olderReleases.releases,
+            isLoadingOlder = state.olderReleases.isLoading,
+            hasMoreOlder = state.olderReleases.hasMore,
+            olderMessage = state.olderReleases.message?.asString(),
+            suggestions = state.suggestions,
+            showApks = state.showApks,
+            showModules = state.showModules,
+            onUrlChange = { viewModel.onAction(HomeUiAction.OnSourceUrlChange(it)) },
+            onFetchClick = { viewModel.onAction(HomeUiAction.OnFetchSourceReleases) },
+            onLoadOlderClick = { viewModel.onAction(HomeUiAction.OnLoadOlderReleases) },
+            onSelectAsset = { asset, release ->
+                viewModel.onAction(HomeUiAction.OnSelectAssetToTrack(asset, release))
+            },
+            onNavigateBack = { viewModel.onAction(HomeUiAction.OnCloseAddSource) }
+        )
+    } else {
+        HomeScreen(
+            state = state,
+            snackbarHostState = snackbarHostState,
+            listState = listState,
+            onAction = viewModel::onAction
+        )
+    }
 }
 
 /**
@@ -113,10 +145,17 @@ fun HomeScreenHost(
 fun HomeScreen(
     state: HomeUiState,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    listState: LazyListState = rememberLazyListState(),
     onAction: (HomeUiAction) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val focusManager = LocalFocusManager.current
+
+    // Any interaction other than typing in the search field hides the keyboard
+    val handleAction: (HomeUiAction) -> Unit = { action ->
+        if (action !is HomeUiAction.OnSearchQueryChange) focusManager.clearFocus()
+        onAction(action)
+    }
 
     val isAnyUpdateDownloading = remember(state.downloadProgressMap, state.trackedApps) {
         state.trackedApps.any { app ->
@@ -125,12 +164,14 @@ fun HomeScreen(
     }
 
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures(onTap = { focusManager.clearFocus() })
+        },
         containerColor = DarkBackground,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { onAction(HomeUiAction.OnOpenAddSheet) },
+                onClick = { handleAction(HomeUiAction.OnOpenAddSource) },
                 icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_action_add_desc)) },
                 text = { Text(stringResource(R.string.home_btn_add), fontWeight = FontWeight.Bold, fontSize = 14.sp) },
                 containerColor = GreenPrimary,
@@ -141,12 +182,13 @@ fun HomeScreen(
     ) { paddingValues ->
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
-            onRefresh = { onAction(HomeUiAction.OnRefresh) },
+            onRefresh = { handleAction(HomeUiAction.OnRefresh) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
@@ -175,7 +217,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         IconButton(
-                            onClick = { onAction(HomeUiAction.OnSettingsClick) }
+                            onClick = { handleAction(HomeUiAction.OnSettingsClick) }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
@@ -190,7 +232,7 @@ fun HomeScreen(
                 item(key = "search_bar") {
                     TopSearchBar(
                         query = state.searchQuery,
-                        onQueryChange = { onAction(HomeUiAction.OnSearchQueryChange(it)) }
+                        onQueryChange = { handleAction(HomeUiAction.OnSearchQueryChange(it)) }
                     )
                 }
 
@@ -202,7 +244,7 @@ fun HomeScreen(
                             totalAppsCount = state.trackedApps.size,
                             isRefreshing = state.isRefreshing,
                             isDownloading = isAnyUpdateDownloading,
-                            onUpdateClick = { onAction(HomeUiAction.OnUpdateAll) }
+                            onUpdateClick = { handleAction(HomeUiAction.OnUpdateAll) }
                         )
                     }
                 }
@@ -275,52 +317,34 @@ fun HomeScreen(
                         TrackedAppCard(
                             app = app,
                             downloadProgress = state.downloadProgressMap[app.id],
-                            onDownloadClick = { onAction(HomeUiAction.OnDownloadApp(app)) },
-                            onCancelDownloadClick = { onAction(HomeUiAction.OnCancelDownload(app.id)) },
+                            onDownloadClick = { handleAction(HomeUiAction.OnDownloadApp(app)) },
+                            onCheckUpdateClick = { handleAction(HomeUiAction.OnCheckAppUpdate(app)) },
+                            onCancelDownloadClick = { handleAction(HomeUiAction.OnCancelDownload(app.id)) },
                             onInstallClick = {
                                 app.localFilePath?.let { path ->
-                                    onAction(HomeUiAction.OnInstallApp(path))
+                                    handleAction(HomeUiAction.OnInstallApp(path))
                                 }
                             },
                             onOpenClick = {
                                 app.packageName?.let { pkg ->
-                                    onAction(HomeUiAction.OnOpenApp(pkg))
+                                    handleAction(HomeUiAction.OnOpenApp(pkg))
                                 }
                             },
                             onUninstallClick = { pkg ->
-                                onAction(HomeUiAction.OnUninstallApp(pkg))
+                                handleAction(HomeUiAction.OnUninstallApp(pkg))
                             },
                             onShareZipClick = {
                                 app.localFilePath?.let { path ->
-                                    onAction(HomeUiAction.OnShareZip(path))
+                                    handleAction(HomeUiAction.OnShareZip(path))
                                 }
                             },
-                            onDeleteClick = { onAction(HomeUiAction.OnDeleteTrackedApp(app.id)) }
+                            onDeleteClick = { handleAction(HomeUiAction.OnDeleteTrackedApp(app.id)) }
                         )
                     }
                 }
             }
         }
     }
-
-    // Modal Bottom Sheet for adding any URL & picking APK/ZIP downloads
-    AddAppSourceSheet(
-        isOpen = state.isAddSheetOpen,
-        sourceUrl = state.addSourceUrl,
-        isFetching = state.isFetchingSource,
-        fetchedRelease = state.fetchedRelease,
-        errorMessage = state.addSourceError,
-        sheetState = sheetState,
-        suggestions = state.suggestions,
-        showApks = state.showApks,
-        showModules = state.showModules,
-        onUrlChange = { onAction(HomeUiAction.OnSourceUrlChange(it)) },
-        onFetchClick = { onAction(HomeUiAction.OnFetchSourceReleases) },
-        onSelectAsset = { asset, release ->
-            onAction(HomeUiAction.OnSelectAssetToTrack(asset, release))
-        },
-        onDismiss = { onAction(HomeUiAction.OnCloseAddSheet) }
-    )
 }
 
 @Preview(showBackground = true)
